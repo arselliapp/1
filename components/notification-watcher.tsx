@@ -138,22 +138,22 @@ export function NotificationWatcher() {
             
             try {
                 // الحصول على الـ session والـ token
-                const { data: { session } } = await supabase.auth.getSession()
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-                if (!session || !session.access_token) {
+                if (sessionError || !session?.access_token) {
+                    // لا يوجد session - المستخدم غير مسجل دخول
                     return
                 }
 
                 const response = await fetch("/api/notifications/list", {
                     method: "GET",
                     headers: {
-                        "Content-Type": "application/json",
                         "Authorization": `Bearer ${session.access_token}`,
                     },
-                    credentials: "include",
                 })
 
                 if (!response.ok) {
+                    // تجاهل أخطاء 401 - قد تكون الـ session منتهية
                     return
                 }
 
