@@ -1,0 +1,12 @@
+{
+  "buildCommand": "next build",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "functions": {
+    "app/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}
+
