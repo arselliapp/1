@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { UserIcon, LogOutIcon, CameraIcon } from "@/components/icons"
+import { UserIcon, LogOutIcon, CameraIcon, ShieldIcon, BellIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
+import { Switch } from "@/components/ui/switch"
 
 export default function SettingsPage() {
   const { user, signOut, updatePhoneNumber } = useAuth()
@@ -27,13 +28,39 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // إعدادات الخصوصية
+  const [hideOnlineStatus, setHideOnlineStatus] = useState(false)
+  const [hideLastSeen, setHideLastSeen] = useState(false)
+  const [hideReadReceipts, setHideReadReceipts] = useState(false)
+
   useEffect(() => {
     if (user) {
       setName(user.user_metadata?.full_name || user.user_metadata?.name || "")
       setPhoneNumber(user.user_metadata?.phone_number || "")
       setAvatarUrl(user.user_metadata?.avatar_url || "")
+      
+      // تحميل إعدادات الخصوصية
+      const privacySettings = localStorage.getItem("privacy_settings")
+      if (privacySettings) {
+        const settings = JSON.parse(privacySettings)
+        setHideOnlineStatus(settings.hideOnlineStatus || false)
+        setHideLastSeen(settings.hideLastSeen || false)
+        setHideReadReceipts(settings.hideReadReceipts || false)
+      }
     }
   }, [user])
+
+  // حفظ إعدادات الخصوصية
+  const savePrivacySettings = (key: string, value: boolean) => {
+    const current = JSON.parse(localStorage.getItem("privacy_settings") || "{}")
+    current[key] = value
+    localStorage.setItem("privacy_settings", JSON.stringify(current))
+    
+    // تحديث الـ state
+    if (key === "hideOnlineStatus") setHideOnlineStatus(value)
+    if (key === "hideLastSeen") setHideLastSeen(value)
+    if (key === "hideReadReceipts") setHideReadReceipts(value)
+  }
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click()
@@ -375,6 +402,64 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* إعدادات الخصوصية */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldIcon className="h-5 w-5" />
+            الخصوصية
+          </CardTitle>
+          <CardDescription>تحكم في من يرى معلوماتك</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* إخفاء حالة متصل */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">إخفاء حالة "متصل"</Label>
+              <p className="text-sm text-muted-foreground">
+                لن يرى الآخرون أنك متصل الآن
+              </p>
+            </div>
+            <Switch
+              checked={hideOnlineStatus}
+              onCheckedChange={(checked) => savePrivacySettings("hideOnlineStatus", checked)}
+            />
+          </div>
+
+          <Separator />
+
+          {/* إخفاء آخر ظهور */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">إخفاء آخر ظهور</Label>
+              <p className="text-sm text-muted-foreground">
+                لن يرى الآخرون متى كنت متصلاً آخر مرة
+              </p>
+            </div>
+            <Switch
+              checked={hideLastSeen}
+              onCheckedChange={(checked) => savePrivacySettings("hideLastSeen", checked)}
+            />
+          </div>
+
+          <Separator />
+
+          {/* إخفاء علامة القراءة */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">إخفاء علامة القراءة</Label>
+              <p className="text-sm text-muted-foreground">
+                لن يرى المرسل أنك قرأت رسالته (✓✓)
+              </p>
+            </div>
+            <Switch
+              checked={hideReadReceipts}
+              onCheckedChange={(checked) => savePrivacySettings("hideReadReceipts", checked)}
+            />
+          </div>
         </CardContent>
       </Card>
 

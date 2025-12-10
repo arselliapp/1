@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { UserPlusIcon, SearchIcon, MessageSquareIcon, TrashIcon } from "@/components/icons"
+import { Badge } from "@/components/ui/badge"
+import { UserPlusIcon, SearchIcon, MessageSquareIcon, TrashIcon, SendIcon, CalendarIcon } from "@/components/icons"
 import { AddContactModal } from "@/components/add-contact-modal"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/toast-notification"
 
 interface Contact {
   id: string
@@ -17,45 +19,31 @@ interface Contact {
   phone: string
   avatar?: string
   contact_user_id: string
+  is_online?: boolean
+  last_seen?: string
 }
 
 export default function ContactsPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
+  const [startingChat, setStartingChat] = useState<string | null>(null)
 
-  // تحديث جهات الاتصال كل 15 ثانية
   useEffect(() => {
     if (user) {
       loadContacts()
-
-      let isPageVisible = true
-      const handleVisibility = () => {
-        isPageVisible = !document.hidden
-        if (!document.hidden) loadContacts(true)
-      }
-      document.addEventListener("visibilitychange", handleVisibility)
-
-      // تحديث تلقائي كل 15 ثانية فقط إذا الصفحة مرئية
-      const interval = setInterval(() => {
-        if (isPageVisible) loadContacts(true)
-      }, 15000)
-
-      return () => {
-        document.removeEventListener("visibilitychange", handleVisibility)
-        clearInterval(interval)
-      }
+      const interval = setInterval(() => loadContacts(true), 15000)
+      return () => clearInterval(interval)
     }
   }, [user])
 
   const loadContacts = async (silent = false) => {
     if (!user) return
-
-    if (!silent) {
-      setLoading(true)
-    }
+    if (!silent) setLoading(true)
+    
     try {
       const { data, error } = await supabase
         .from("contacts")
@@ -64,7 +52,6 @@ export default function ContactsPage() {
         .eq("status", "accepted")
 
       if (error) {
-        console.error("Error loading contacts:", error)
         if (!silent) setLoading(false)
         return
       }
@@ -76,12 +63,21 @@ export default function ContactsPage() {
 
           const userData = result && result.length > 0 ? result[0] : null
 
+          // جلب حالة الاتصال
+          const { data: presence } = await supabase
+            .from("user_presence")
+            .select("is_online, last_seen")
+            .eq("user_id", contact.contact_user_id)
+            .single()
+
           return {
             id: contact.id,
             contact_user_id: contact.contact_user_id,
             name: userData?.full_name || "مستخدم",
             phone: userData?.phone_number || "",
-            avatar: userData?.avatar_url
+            avatar: userData?.avatar_url,
+            is_online: presence?.is_online || false,
+            last_seen: presence?.last_seen
           }
         })
       )
@@ -90,32 +86,81 @@ export default function ContactsPage() {
     } catch (err) {
       console.error("Error loading contacts:", err)
     } finally {
-      if (!silent) {
-        setLoading(false)
+      if (!silent) setLoading(false)
+    }
+  }
+
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    showToast({
+      title: "🗑️ حذف جهة الاتصال",
+      message: `هل تريد حذف ${contactName}؟`,
+      type: "info",
+      action: {
+        label: "حذف",
+        onClick: async () => {
+          const { error } = await supabase
+            .from("contacts")
+            .delete()
+            .eq("id", contactId)
+
+          if (!error) {
+            showToast({ title: "✅ تم الحذف", message: "تم حذف جهة الاتصال", type: "success" })
+            loadContacts()
+          }
+        }
       }
+    })
+  }
+
+  // بدء محادثة
+  const handleStartChat = async (contactUserId: string) => {
+    setStartingChat(contactUserId)
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        showToast({ title: "⚠️ خطأ", message: "يجب تسجيل الدخول", type: "error" })
+        return
+      }
+
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ other_user_id: contactUserId })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        router.push(`/chat/${data.conversation_id}`)
+      } else {
+        showToast({ title: "❌ خطأ", message: "فشل بدء المحادثة", type: "error" })
+      }
+    } catch (err) {
+      console.error("Error starting chat:", err)
+      showToast({ title: "❌ خطأ", message: "حدث خطأ غير متوقع", type: "error" })
+    } finally {
+      setStartingChat(null)
     }
   }
 
-  const handleDeleteContact = async (contactId: string) => {
-    if (!confirm("هل أنت متأكد من حذف جهة الاتصال هذه؟")) return
-
-    const { error } = await supabase
-      .from("contacts")
-      .delete()
-      .eq("id", contactId)
-
-    if (!error) {
-      loadContacts()
-    }
-  }
-
-  const handleSendRequest = (contactUserId: string) => {
-    router.push(`/send-request?contact=${contactUserId}`)
+  // إرسال تنبيه
+  const handleSendReminder = (contactUserId: string) => {
+    router.push(`/send-reminder?to=${contactUserId}`)
   }
 
   const filteredContacts = contacts.filter(
     (contact) => contact.name.includes(searchQuery) || contact.phone.includes(searchQuery)
   )
+
+  // ترتيب: المتصلين أولاً
+  const sortedContacts = [...filteredContacts].sort((a, b) => {
+    if (a.is_online && !b.is_online) return -1
+    if (!a.is_online && b.is_online) return 1
+    return 0
+  })
 
   if (loading) {
     return (
@@ -126,73 +171,101 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="space-y-6" dir="rtl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">جهات الاتصال</h1>
-          <p className="text-muted-foreground">إدارة جهات الاتصال الخاصة بك</p>
+          <h1 className="text-2xl font-bold">👥 جهات الاتصال</h1>
+          <p className="text-muted-foreground">{contacts.length} جهة اتصال</p>
         </div>
         <AddContactModal />
       </div>
 
-      <div className="relative animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: "100ms" }}>
+      <div className="relative">
         <SearchIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="البحث في جهات الاتصال..."
+          placeholder="البحث بالاسم أو الرقم..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pr-10"
         />
       </div>
 
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: "200ms" }}>
-        <h2 className="text-lg font-semibold">جهات الاتصال ({filteredContacts.length})</h2>
-        {filteredContacts.length === 0 ? (
-          <Card>
+      <div className="space-y-4">
+        {sortedContacts.length === 0 ? (
+          <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <UserPlusIcon className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">لا توجد جهات اتصال بعد</p>
-              <AddContactModal />
+              <p className="text-muted-foreground mb-4">
+                {searchQuery ? "لا توجد نتائج" : "لا توجد جهات اتصال بعد"}
+              </p>
+              {!searchQuery && <AddContactModal />}
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredContacts.map((contact, index) => (
+            {sortedContacts.map((contact, index) => (
               <Card
                 key={contact.id}
-                className="group hover:border-primary/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="group hover:border-primary/50 hover:shadow-lg transition-all duration-300"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
-                    <Avatar className="transition-transform duration-300 group-hover:scale-110">
-                      <AvatarImage src={contact.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>{contact.name[0]}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={contact.avatar} />
+                        <AvatarFallback className="text-lg">{contact.name[0]}</AvatarFallback>
+                      </Avatar>
+                      {/* مؤشر الحالة */}
+                      <span className={`absolute bottom-0 left-0 w-3.5 h-3.5 rounded-full border-2 border-background ${contact.is_online ? "bg-green-500" : "bg-gray-400"}`} />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{contact.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">{contact.name}</p>
+                        {contact.is_online && (
+                          <Badge className="bg-green-500 text-[10px] px-1.5 py-0">متصل</Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground truncate" dir="ltr">{contact.phone}</p>
                     </div>
                   </div>
-                  <div className="mt-4 flex gap-2">
+                  
+                  {/* الأزرار */}
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-primary hover:bg-primary/90"
+                      onClick={() => handleStartChat(contact.contact_user_id)}
+                      disabled={startingChat === contact.contact_user_id}
+                    >
+                      {startingChat === contact.contact_user_id ? (
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <MessageSquareIcon className="ml-1 h-4 w-4" />
+                          محادثة
+                        </>
+                      )}
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1 bg-transparent hover:bg-primary hover:text-primary-foreground transition-all duration-300"
-                      onClick={() => handleSendRequest(contact.contact_user_id)}
+                      onClick={() => handleSendReminder(contact.contact_user_id)}
                     >
-                      <MessageSquareIcon className="ml-1 h-4 w-4" />
-                      إرسال طلب
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-300"
-                      onClick={() => handleDeleteContact(contact.id)}
-                    >
-                      <TrashIcon className="h-4 w-4" />
+                      <CalendarIcon className="ml-1 h-4 w-4" />
+                      تنبيه
                     </Button>
                   </div>
+                  
+                  {/* زر الحذف */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteContact(contact.id, contact.name)}
+                  >
+                    <TrashIcon className="ml-1 h-4 w-4" />
+                    حذف
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -202,4 +275,3 @@ export default function ContactsPage() {
     </div>
   )
 }
-
