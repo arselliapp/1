@@ -5,10 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { TrashIcon, ShieldIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+
+// الرقم السري للوحة التحكم
+const ADMIN_PIN = "1486"
 
 interface Contact {
   id: string
@@ -46,19 +50,36 @@ export default function AdminPage() {
     totalRequests: 0
   })
 
-  // قائمة معرفات المديرين
-  const ADMIN_IDS = [user?.id || ""]
+  // حالة التحقق من الرقم السري
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [pin, setPin] = useState("")
+  const [pinError, setPinError] = useState("")
+
+  // التحقق من الـ session المحفوظة
+  useEffect(() => {
+    const savedAuth = sessionStorage.getItem("admin_authenticated")
+    if (savedAuth === "true") {
+      setIsAuthenticated(true)
+    }
+  }, [])
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (pin === ADMIN_PIN) {
+      setIsAuthenticated(true)
+      sessionStorage.setItem("admin_authenticated", "true")
+      setPinError("")
+    } else {
+      setPinError("الرقم السري غير صحيح")
+      setPin("")
+    }
+  }
 
   useEffect(() => {
-    if (user) {
-      if (!ADMIN_IDS.includes(user.id)) {
-        router.push("/dashboard")
-        return
-      }
+    if (user && isAuthenticated) {
       loadData()
     }
-     
-  }, [user])
+  }, [user, isAuthenticated])
 
   const loadData = async () => {
     setLoading(true)
@@ -194,6 +215,54 @@ export default function AdminPage() {
     }
     const s = statusMap[status] || { label: status, variant: "secondary" }
     return <Badge variant={s.variant} className="text-xs">{s.label}</Badge>
+  }
+
+  // شاشة إدخال الرقم السري
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+        <Card className="w-full max-w-sm bg-slate-800/50 border-slate-700">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-500 to-orange-600 rounded-full flex items-center justify-center mb-4">
+              <ShieldIcon className="w-8 h-8 text-white" />
+            </div>
+            <CardTitle className="text-xl text-white">لوحة التحكم</CardTitle>
+            <p className="text-slate-400 text-sm">أدخل الرقم السري للدخول</p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <Input
+                type="password"
+                placeholder="الرقم السري"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                className="bg-slate-700/50 border-slate-600 text-white text-center text-2xl tracking-widest"
+                maxLength={4}
+                autoFocus
+              />
+              {pinError && (
+                <p className="text-red-400 text-sm text-center">{pinError}</p>
+              )}
+              <Button
+                type="submit"
+                className="w-full bg-red-600 hover:bg-red-700"
+                disabled={pin.length !== 4}
+              >
+                دخول
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-slate-400"
+                onClick={() => router.push("/dashboard")}
+              >
+                العودة
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (loading) {

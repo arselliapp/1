@@ -142,6 +142,24 @@ export default function SettingsPage() {
 
       // Update phone if changed
       if (phoneNumber && phoneNumber !== user?.user_metadata?.phone_number) {
+        // التحقق من تكرار رقم الجوال
+        const checkResponse = await fetch("/api/check-phone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone_number: phoneNumber.trim(),
+            user_id: user?.id
+          })
+        })
+
+        const checkResult = await checkResponse.json()
+
+        if (checkResult.exists) {
+          setError("⚠️ رقم الجوال مسجل مسبقاً بحساب آخر. الرجاء استخدام رقم مختلف.")
+          setIsSaving(false)
+          return
+        }
+
         const { error: updateError } = await updatePhoneNumber(phoneNumber.trim())
         
         if (updateError) {
