@@ -78,12 +78,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    setLoading(true)
-    await supabase.auth.signOut()
-    setSession(null)
-    setUser(null)
-    setLoading(false)
-    window.location.href = "/login"
+    try {
+      // مسح الحالة أولاً
+      setSession(null)
+      setUser(null)
+      setLoading(false)
+      
+      // مسح جميع بيانات التخزين
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // مسح الـ cache
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+      }
+      
+      // تسجيل الخروج من Supabase
+      await supabase.auth.signOut()
+      
+      // إعادة التوجيه فوراً
+      window.location.replace("/login")
+    } catch (error) {
+      console.error("Sign out error:", error)
+      // حتى لو حدث خطأ، أعد التوجيه
+      window.location.replace("/login")
+    }
   }
 
   return (

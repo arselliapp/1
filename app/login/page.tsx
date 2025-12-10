@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,6 +8,16 @@ import { SendIcon } from "@/components/icons"
 
 export default function LoginPage() {
   const { signInWithGoogle, loading } = useAuth()
+  const [isReady, setIsReady] = useState(false)
+
+  // التأكد من جاهزية الصفحة
+  useEffect(() => {
+    // تأخير بسيط للتأكد من تحميل كل شيء
+    const timer = setTimeout(() => {
+      setIsReady(true)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
     <div
@@ -25,7 +36,7 @@ export default function LoginPage() {
           {/* تسجيل الدخول بـ Google */}
           <Button
             onClick={signInWithGoogle}
-            disabled={loading}
+            disabled={loading || !isReady}
             className="w-full bg-white hover:bg-slate-100 text-slate-900 font-medium py-6"
           >
             <svg className="w-5 h-5 ml-2" viewBox="0 0 24 24">
