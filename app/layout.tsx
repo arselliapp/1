@@ -126,6 +126,39 @@ export default function RootLayout({
 
         <meta name="apple-mobile-web-app-title" content="أرسل لي" />
 
+        {/* سكربت لإصلاح مشاكل التخزين المؤقت */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            // مسح Service Workers القديمة
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (let registration of registrations) {
+                  if (registration.active && registration.active.scriptURL.includes('sw.js')) {
+                    // إعادة تسجيل SW إذا كان قديماً
+                    registration.update();
+                  }
+                }
+              });
+            }
+            
+            // إعادة تحميل الصفحة إذا كانت عالقة
+            window.addEventListener('load', function() {
+              setTimeout(function() {
+                var content = document.body.innerHTML;
+                if (!content || content.trim().length < 100) {
+                  // الصفحة فارغة - أعد التحميل
+                  if (!sessionStorage.getItem('reloaded')) {
+                    sessionStorage.setItem('reloaded', 'true');
+                    window.location.reload();
+                  }
+                } else {
+                  sessionStorage.removeItem('reloaded');
+                }
+              }, 3000);
+            });
+          `
+        }} />
+
       </head>
 
       <body className={`${notoArabic.className} antialiased`}>
