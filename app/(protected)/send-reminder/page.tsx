@@ -323,10 +323,12 @@ export default function SendReminderPage() {
             {needsDetails && (
               <>
                 <div>
-                  <Label htmlFor="description">الوصف (اختياري)</Label>
+                  <Label htmlFor="description">
+                    {selectedType === "meeting" ? "الغرض منه (اختياري)" : "الوصف (اختياري)"}
+                  </Label>
                   <Textarea
                     id="description"
-                    placeholder="تفاصيل إضافية..."
+                    placeholder={selectedType === "meeting" ? "ما هو الغرض من الاجتماع؟" : "تفاصيل إضافية..."}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}

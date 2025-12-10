@@ -20,6 +20,8 @@ import { NetworkStatus } from "@/components/network-status"
 
 import { NotificationPermission } from "@/components/notification-permission"
 
+import { ReminderChecker } from "@/components/reminder-checker"
+
 import { Footer } from "@/components/footer"
 
 import "./globals.css"
@@ -182,6 +184,8 @@ export default function RootLayout({
               <NetworkStatus />
 
               <NotificationPermission />
+
+              <ReminderChecker />
 
               <Footer />
 

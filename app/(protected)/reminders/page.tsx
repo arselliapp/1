@@ -58,19 +58,26 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState(defaultTab)
   const [responseDialog, setResponseDialog] = useState<{
     show: boolean
     reminder: Reminder | null
     action: "accept" | "decline"
     selectedHours: number[]
     message: string
-  }>({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" }) // بدون تحديد مسبق
+  }>({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" })
 
   const [counts, setCounts] = useState({ upcoming: 0, pending: 0, sent: 0 })
 
   useEffect(() => {
     if (user) loadReminders()
   }, [user])
+
+  // تحديث التبويب عند تغيير الرابط
+  useEffect(() => {
+    const tab = searchParams?.get("tab")
+    if (tab) setActiveTab(tab)
+  }, [searchParams])
 
   const loadReminders = async () => {
     try {
@@ -161,7 +168,7 @@ export default function RemindersPage() {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
 
-    if (days > 0) return `بعد ${days} يوم${days > 1 ? "" : ""}`
+    if (days > 0) return `بعد ${days} يوم`
     if (hours > 0) return `بعد ${hours} ساعة`
     return "قريباً جداً"
   }
@@ -181,20 +188,43 @@ export default function RemindersPage() {
     }
   }
 
-  // تنبيهات قادمة (مقبولة + لم تنتهي + واردة)
-  const upcoming = reminders.filter(r => !r.is_past && r.status === "accepted" && !r.is_sent)
-  // تنبيهات معلقة (بانتظار الرد + واردة)
-  const pending = reminders.filter(r => r.status === "pending" && !r.is_sent)
-  // تنبيهات مرسلة (جميعها)
-  const sent = reminders.filter(r => r.is_sent)
-  // السجل: التنبيهات الواردة المنتهية أو المرفوضة
-  const history = reminders.filter(r => 
-    !r.is_sent && (
-      r.is_past || // منتهي
-      r.status === "declined" || // مرفوض
-      r.status === "expired" // منتهي الصلاحية
+  // ترتيب حسب التاريخ (الأقرب أولاً للقادمة، الأحدث أولاً للباقي)
+  const sortByDateAsc = (a: Reminder, b: Reminder) => 
+    new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+  const sortByDateDesc = (a: Reminder, b: Reminder) => 
+    new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
+
+  // تنبيهات قادمة (مقبولة + لم تنتهي + واردة) - مرتبة بالأقرب أولاً
+  const upcoming = reminders
+    .filter(r => !r.is_past && r.status === "accepted" && !r.is_sent)
+    .sort(sortByDateAsc)
+  
+  // تنبيهات معلقة (بانتظار الرد + واردة) - مرتبة بالأقرب أولاً
+  const pending = reminders
+    .filter(r => r.status === "pending" && !r.is_sent)
+    .sort(sortByDateAsc)
+  
+  // تنبيهات مرسلة (جميعها) - مرتبة بالأحدث أولاً
+  const sent = reminders
+    .filter(r => r.is_sent)
+    .sort(sortByDateDesc)
+  
+  // السجل: التنبيهات الواردة المنتهية أو المرفوضة (بدون المرسلة) - مرتبة بالأحدث أولاً
+  const history = reminders
+    .filter(r => 
+      !r.is_sent && (
+        r.is_past ||
+        r.status === "declined" ||
+        r.status === "expired"
+      )
     )
-  )
+    .sort(sortByDateDesc)
+
+  // تغيير التبويب
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    router.push(`/reminders?tab=${tab}`, { scroll: false })
+  }
 
   if (loading) {
     return (
@@ -221,9 +251,14 @@ export default function RemindersPage() {
           {getStatusBadge(reminder.status)}
         </div>
 
-        {/* Description */}
+        {/* Description - يظهر كـ "الغرض منه" للاجتماعات */}
         {reminder.description && (
-          <p className="mt-3 text-sm text-muted-foreground">{reminder.description}</p>
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground mb-1">
+              {reminder.reminder_type === "meeting" ? "📌 الغرض منه:" : "📝 الوصف:"}
+            </p>
+            <p className="text-sm text-muted-foreground">{reminder.description}</p>
+          </div>
         )}
 
         {/* Event Details - لا تظهر للاتصال */}
@@ -272,7 +307,7 @@ export default function RemindersPage() {
                 show: true,
                 reminder,
                 action: "accept",
-                selectedHours: [], // بدون تحديد مسبق
+                selectedHours: [],
                 message: ""
               })}
             >
@@ -398,21 +433,30 @@ export default function RemindersPage() {
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* Stats - قابلة للضغط */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-amber-500/10 border-amber-500/30">
+        <Card 
+          className="bg-amber-500/10 border-amber-500/30 cursor-pointer hover:scale-[1.02] transition-transform"
+          onClick={() => handleTabChange("pending")}
+        >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-amber-500">{counts.pending}</p>
             <p className="text-xs text-muted-foreground">بانتظار الرد</p>
           </CardContent>
         </Card>
-        <Card className="bg-green-500/10 border-green-500/30">
+        <Card 
+          className="bg-green-500/10 border-green-500/30 cursor-pointer hover:scale-[1.02] transition-transform"
+          onClick={() => handleTabChange("upcoming")}
+        >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-green-500">{counts.upcoming}</p>
             <p className="text-xs text-muted-foreground">مواعيد قادمة</p>
           </CardContent>
         </Card>
-        <Card className="bg-blue-500/10 border-blue-500/30">
+        <Card 
+          className="bg-blue-500/10 border-blue-500/30 cursor-pointer hover:scale-[1.02] transition-transform"
+          onClick={() => handleTabChange("sent")}
+        >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-blue-500">{counts.sent}</p>
             <p className="text-xs text-muted-foreground">مرسلة</p>
@@ -421,7 +465,7 @@ export default function RemindersPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue={defaultTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 h-12">
           <TabsTrigger value="upcoming" className="text-xs sm:text-sm">
             🗓️ القادمة
@@ -484,6 +528,7 @@ export default function RemindersPage() {
               <CardContent className="p-12 text-center">
                 <ClockIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-lg font-medium text-muted-foreground">لا يوجد سجل</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">التنبيهات المنتهية أو المرفوضة ستظهر هنا</p>
               </CardContent>
             </Card>
           ) : (
@@ -494,4 +539,3 @@ export default function RemindersPage() {
     </div>
   )
 }
-
