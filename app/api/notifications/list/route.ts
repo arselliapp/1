@@ -1,31 +1,32 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase-server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function GET(request: NextRequest) {
   try {
-    const adminClient = createAdminClient()
-
-    // محاولة الحصول على الـ user_id من Authorization header
-    let userId: string | null = null
-
+    // الحصول على الـ token من Authorization header
     const authHeader = request.headers.get("authorization")
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7)
-
-      try {
-        const { data, error } = await adminClient.auth.getUser(token)
-        if (!error && data.user?.id) {
-          userId = data.user.id
-        }
-      } catch (err) {
-        // Silent error handling
-      }
-    }
-
-    if (!userId) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
+    
+    // إنشاء Supabase client للتحقق من الـ token
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    
+    if (userError || !userData.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const userId = userData.user.id
+    const adminClient = createAdminClient()
 
     // سحب الإشعارات للمستخدم الحالي مباشرة (بدون RLS)
     const { data: notifications, error } = await adminClient

@@ -1,46 +1,32 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createRouteHandlerClient, createAdminClient } from "@/lib/supabase-server"
+import { createAdminClient } from "@/lib/supabase-server"
+import { createClient } from "@supabase/supabase-js"
 import { checkRateLimit, detectSpamPatterns } from "@/lib/anti-spam"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient()
-
-    // محاولة الحصول على الـ session
-    let session = null
-    let sessionError = null
-
-    try {
-      const { data: sessionData, error } = await supabase.auth.getSession()
-      session = sessionData?.session
-      sessionError = error
-    } catch (err) {
-      // Silent error handling
+    // الحصول على الـ token من Authorization header
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized: No token provided" }, { status: 401 })
     }
 
-    // إذا لم نجد session من cookies، حاول من Authorization header
-    if (!session) {
-      const authHeader = request.headers.get("authorization")
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.substring(7)
+    const token = authHeader.substring(7)
+    
+    // إنشاء Supabase client والتحقق من الـ token
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
-        try {
-          const { data, error } = await supabase.auth.getUser(token)
-          if (error || !data.user) {
-            return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 })
-          }
-          // استخدم الـ user من الـ token
-          session = { user: data.user } as any
-        } catch (err) {
-          // Silent error handling
-        }
-      }
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    
+    if (userError || !userData.user) {
+      return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 })
     }
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const session = { user: userData.user }
 
     const { recipient_id, message, type } = await request.json()
 
