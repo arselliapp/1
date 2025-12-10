@@ -8,10 +8,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
-  signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
-  sendMagicLink: (email: string, phoneNumber: string) => Promise<{ error: Error | null }>
   updatePhoneNumber: (phoneNumber: string) => Promise<{ error: Error | null }>
 }
 
@@ -64,73 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signInWithEmail = async (email: string, password: string) => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (data.session) {
-      setSession(data.session as unknown as Session)
-      setUser(data.user as unknown as User)
-      
-      // حفظ الـ session في الـ cookies عبر API
-      try {
-        await fetch("/api/auth/session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }),
-        })
-      } catch (err) {
-        console.error("Error saving session to cookies:", err)
-      }
-    }
-    setLoading(false)
-    return { error: error as Error | null }
-  }
-
-  const signUp = async (email: string, password: string) => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signUp({ email, password })
-    if (data.session) {
-      setSession(data.session as unknown as Session)
-      setUser(data.user as unknown as User)
-      
-      // حفظ الـ session في الـ cookies عبر API
-      try {
-        await fetch("/api/auth/session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }),
-        })
-      } catch (err) {
-        console.error("Error saving session to cookies:", err)
-      }
-    }
-    setLoading(false)
-    return { error: error as Error | null }
-  }
-
-  const sendMagicLink = async (email: string, phoneNumber: string) => {
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: { phone_number: phoneNumber },
-      },
-    })
-    setLoading(false)
-    return { error: error as Error | null }
-  }
-
   const updatePhoneNumber = async (phoneNumber: string) => {
     if (!user) return { error: new Error("User not logged in") }
 
@@ -158,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signInWithGoogle, signInWithEmail, signUp, signOut, sendMagicLink, updatePhoneNumber }}
+      value={{ user, session, loading, signInWithGoogle, signOut, updatePhoneNumber }}
     >
       {children}
     </AuthContext.Provider>
