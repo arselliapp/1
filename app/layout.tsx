@@ -8,6 +8,8 @@ import { AuthProvider } from "@/contexts/auth-context"
 
 import { ErrorBoundary } from "@/components/error-boundary"
 
+import { ToastProvider } from "@/components/toast-notification"
+
 import { PhoneNumberModal } from "@/components/phone-number-modal"
 
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
@@ -167,19 +169,23 @@ export default function RootLayout({
 
           <AuthProvider>
 
-            {children}
+            <ToastProvider>
 
-            <PhoneNumberModal />
+              {children}
 
-            <PWAInstallPrompt />
+              <PhoneNumberModal />
 
-            <PWAUpdateNotifier />
+              <PWAInstallPrompt />
 
-            <NetworkStatus />
+              <PWAUpdateNotifier />
 
-            <NotificationPermission />
+              <NetworkStatus />
 
-            <Footer />
+              <NotificationPermission />
+
+              <Footer />
+
+            </ToastProvider>
 
           </AuthProvider>
 

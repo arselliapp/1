@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SendIcon, SearchIcon, UserIcon, MessageSquareIcon, PhoneIcon, CalendarIcon, HeartIcon, UsersIcon, BellIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/toast-notification"
 
 interface Contact {
   id: string
@@ -36,6 +37,7 @@ export default function SendRequestPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preselectedContactId = searchParams.get("contact")
+  const { showToast } = useToast()
 
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [requestType, setRequestType] = useState<string>("")
@@ -112,7 +114,11 @@ export default function SendRequestPage() {
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session) {
-        alert("يجب تسجيل الدخول أولاً")
+        showToast({
+          type: "error",
+          title: "⚠️ يجب تسجيل الدخول",
+          message: "سجل دخولك أولاً لإرسال الطلبات"
+        })
         setIsSubmitting(false)
         return
       }
@@ -142,20 +148,51 @@ export default function SendRequestPage() {
 
       if (!response.ok) {
         console.error("Error sending request:", result.error)
-        alert(result.error || "حدث خطأ أثناء إرسال الطلب.")
+        showToast({
+          type: "error",
+          title: "❌ فشل إرسال الطلب",
+          message: result.error || "حدث خطأ أثناء إرسال الطلب"
+        })
         setIsSubmitting(false)
         return
       }
 
-      console.log("✅ Request sent successfully:", result)
-      alert("تم إرسال الطلب بنجاح! سيتم إرسال إشعار للمستقبِل.")
+      // رسالة نجاح مخصصة حسب نوع الطلب
+      const typeMessages: Record<string, string> = {
+        whatsapp: "سيصل إشعار للمستلم بطلب الواتساب",
+        x: "سيصل إشعار للمستلم بطلب المتابعة",
+        snapchat: "سيصل إشعار للمستلم بطلب الإضافة",
+        marriage: "سيصل إشعار للمستلم بدعوة الزواج",
+        meeting: "سيصل إشعار للمستلم بطلب الاجتماع",
+        callback: "سيصل إشعار للمستلم بطلب رد الاتصال",
+        reminder: "سيصل إشعار للمستلم بالتذكير",
+      }
+
+      showToast({
+        type: "success",
+        title: "✅ تم إرسال الطلب بنجاح!",
+        message: typeMessages[requestType] || "سيصل إشعار للمستلم قريباً",
+        action: {
+          label: "عرض الطلبات المرسلة",
+          onClick: () => router.push("/requests?tab=sent")
+        }
+      })
+
       setMessage("")
       setSelectedContact(null)
       setRequestType("")
-      router.push("/requests?tab=sent")
+      
+      // الانتقال بعد 2 ثانية
+      setTimeout(() => {
+        router.push("/requests?tab=sent")
+      }, 2000)
     } catch (err) {
       console.error("Error:", err)
-      alert("حدث خطأ غير متوقع.")
+      showToast({
+        type: "error",
+        title: "❌ خطأ غير متوقع",
+        message: "حدث خطأ، حاول مرة أخرى"
+      })
       setIsSubmitting(false)
     }
   }
