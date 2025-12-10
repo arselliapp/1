@@ -10,6 +10,19 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "@/components/icons"
 
+// تحويل الأرقام العربية إلى إنجليزية
+function normalizePhoneNumber(phone: string): string {
+  const arabicNumerals = '٠١٢٣٤٥٦٧٨٩'
+  const englishNumerals = '0123456789'
+  
+  let normalized = phone
+  for (let i = 0; i < arabicNumerals.length; i++) {
+    normalized = normalized.replace(new RegExp(arabicNumerals[i], 'g'), englishNumerals[i])
+  }
+  
+  return normalized.replace(/[\s\-\(\)]/g, '').trim()
+}
+
 export function PhoneNumberModal() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -30,17 +43,46 @@ export function PhoneNumberModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    
     if (!phoneNumber.trim()) {
       setError("الرجاء إدخال رقم الجوال.")
+      return
+    }
+
+    // تحويل الأرقام العربية إلى إنجليزية
+    const normalizedPhone = normalizePhoneNumber(phoneNumber)
+    
+    // التحقق من صحة الرقم
+    if (!/^05\d{8}$/.test(normalizedPhone)) {
+      setError("الرجاء إدخال رقم جوال صحيح (مثال: 05xxxxxxxx)")
       return
     }
 
     setIsSubmitting(true)
 
     try {
+      // التحقق من تكرار رقم الجوال
+      const checkResponse = await fetch("/api/check-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone_number: normalizedPhone,
+          user_id: user?.id
+        })
+      })
+
+      const checkResult = await checkResponse.json()
+      console.log("📱 Check result:", checkResult)
+
+      if (checkResult.exists) {
+        setError("⚠️ رقم الجوال مسجل مسبقاً بحساب آخر. الرجاء استخدام رقم مختلف.")
+        setIsSubmitting(false)
+        return
+      }
+
       // 1. Update user metadata in Supabase
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { phone_number: phoneNumber.trim() },
+        data: { phone_number: normalizedPhone },
       })
 
       if (updateError) {
