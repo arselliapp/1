@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { X } from "lucide-react"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -14,6 +13,7 @@ export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
     // التحقق من التثبيت السابق
@@ -22,18 +22,27 @@ export function PWAInstallPrompt() {
       return
     }
 
+    // التحقق من iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    setIsIOS(isIOSDevice)
+
+    // إذا كان iOS ولم يتم التثبيت، اعرض الرسالة
+    if (isIOSDevice) {
+      const timer = setTimeout(() => {
+        setShowPrompt(true)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+
     // الاستماع لحدث beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
       
-      // عرض البانر بعد 5 ثوانٍ
+      // عرض البانر بعد 2 ثانية (إجباري)
       setTimeout(() => {
-        const dismissed = localStorage.getItem('pwa-prompt-dismissed')
-        if (!dismissed) {
-          setShowPrompt(true)
-        }
-      }, 5000)
+        setShowPrompt(true)
+      }, 2000)
     }
 
     window.addEventListener('beforeinstallprompt', handler)
@@ -42,7 +51,6 @@ export function PWAInstallPrompt() {
     window.addEventListener('appinstalled', () => {
       setIsInstalled(true)
       setShowPrompt(false)
-      localStorage.removeItem('pwa-prompt-dismissed')
     })
 
     return () => {
@@ -58,49 +66,82 @@ export function PWAInstallPrompt() {
 
     if (outcome === 'accepted') {
       console.log('PWA installed')
+      setIsInstalled(true)
     }
 
     setDeferredPrompt(null)
     setShowPrompt(false)
   }
 
-  const handleDismiss = () => {
-    setShowPrompt(false)
-    localStorage.setItem('pwa-prompt-dismissed', 'true')
-  }
-
   if (isInstalled || !showPrompt) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-md">
-      <Card className="p-4 shadow-lg border-2 border-primary/20 bg-background">
-        <button
-          onClick={handleDismiss}
-          className="absolute top-2 left-2 p-1 rounded-full hover:bg-muted"
-          aria-label="إغلاق"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        <div className="flex items-start gap-3 mb-3">
-          <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-2xl">
-            📱
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <Card className="bg-slate-800 border-slate-700 p-6 shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-300">
+        <div className="text-center">
+          {/* الأيقونة */}
+          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-4xl shadow-lg">
+            📲
           </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-lg mb-1">ثبّت التطبيق</h3>
-            <p className="text-sm text-muted-foreground">
-              احصل على تجربة أفضل مع التطبيق المثبت على جهازك
-            </p>
-          </div>
-        </div>
 
-        <div className="flex gap-2">
-          <Button onClick={handleInstall} className="flex-1">
-            تثبيت الآن
-          </Button>
-          <Button onClick={handleDismiss} variant="outline">
-            لاحقاً
-          </Button>
+          {/* العنوان */}
+          <h3 className="text-white text-xl font-bold mb-2">
+            أضف التطبيق للشاشة الرئيسية
+          </h3>
+
+          {/* الوصف */}
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+            للحصول على تجربة أفضل وإشعارات فورية، أضف التطبيق إلى شاشتك الرئيسية
+          </p>
+
+          {isIOS ? (
+            // تعليمات iOS
+            <div className="space-y-4">
+              <div className="bg-slate-700/50 rounded-xl p-4 text-right">
+                <p className="text-white text-sm mb-3">📱 خطوات الإضافة على iPhone/iPad:</p>
+                <ol className="text-slate-300 text-sm space-y-2 list-decimal list-inside">
+                  <li>اضغط على زر المشاركة <span className="text-blue-400">⬆️</span></li>
+                  <li>اختر "إضافة إلى الشاشة الرئيسية"</li>
+                  <li>اضغط "إضافة"</li>
+                </ol>
+              </div>
+              <Button
+                onClick={() => setShowPrompt(false)}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3"
+              >
+                ✅ فهمت، سأضيفه الآن
+              </Button>
+            </div>
+          ) : (
+            // زر التثبيت لـ Android/Desktop
+            <Button
+              onClick={handleInstall}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-medium"
+            >
+              📲 تثبيت التطبيق
+            </Button>
+          )}
+
+          {/* المميزات */}
+          <div className="mt-6 grid grid-cols-3 gap-2 text-center">
+            <div className="bg-slate-700/30 rounded-lg p-2">
+              <div className="text-xl mb-1">⚡</div>
+              <p className="text-slate-400 text-xs">أسرع</p>
+            </div>
+            <div className="bg-slate-700/30 rounded-lg p-2">
+              <div className="text-xl mb-1">🔔</div>
+              <p className="text-slate-400 text-xs">إشعارات</p>
+            </div>
+            <div className="bg-slate-700/30 rounded-lg p-2">
+              <div className="text-xl mb-1">📴</div>
+              <p className="text-slate-400 text-xs">بدون نت</p>
+            </div>
+          </div>
+
+          {/* ملاحظة */}
+          <p className="text-slate-500 text-xs mt-4">
+            التطبيق مجاني ولا يحتاج مساحة كبيرة
+          </p>
         </div>
       </Card>
     </div>

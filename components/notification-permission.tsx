@@ -16,18 +16,25 @@ export function NotificationPermission() {
       return
     }
 
-    const currentPermission = Notification.permission
-    setPermission(currentPermission)
+    const checkPermission = () => {
+      const currentPermission = Notification.permission
+      setPermission(currentPermission)
 
-    // عرض الطلب إذا لم يتم السماح أو الرفض
-    if (currentPermission === "default") {
-      // الانتظار 3 ثوانٍ قبل عرض الطلب
-      const timer = setTimeout(() => {
+      // عرض الطلب إذا لم يتم السماح (إجباري)
+      if (currentPermission !== "granted") {
         setShowPrompt(true)
-      }, 3000)
-
-      return () => clearTimeout(timer)
+      } else {
+        setShowPrompt(false)
+      }
     }
+
+    // التحقق فوراً
+    checkPermission()
+
+    // التحقق كل 5 ثواني إذا تم إلغاء الإشعارات
+    const interval = setInterval(checkPermission, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const requestPermission = async () => {
@@ -123,40 +130,60 @@ export function NotificationPermission() {
     }
   }
 
-  if (!showPrompt || permission !== "default") {
+  if (!showPrompt) {
     return null
   }
 
+  const isDenied = permission === "denied"
+
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 animate-slide-up">
-      <Card className="bg-slate-800 border-slate-700 p-4 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-            <BellIcon className="w-5 h-5 text-emerald-500" />
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <Card className="bg-slate-800 border-slate-700 p-6 shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-300">
+        <div className="text-center">
+          {/* الأيقونة */}
+          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
+            <BellIcon className="w-10 h-10 text-white" />
           </div>
-          <div className="flex-1">
-            <h3 className="text-white font-semibold mb-1">تفعيل الإشعارات</h3>
-            <p className="text-slate-400 text-sm mb-3">
-              احصل على إشعارات فورية عند وصول طلبات جديدة
-            </p>
-            <div className="flex gap-2">
+
+          {/* العنوان */}
+          <h3 className="text-white text-xl font-bold mb-2">
+            {isDenied ? "⚠️ الإشعارات مطلوبة" : "🔔 فعّل الإشعارات"}
+          </h3>
+
+          {/* الوصف */}
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+            {isDenied 
+              ? "لقد قمت بحظر الإشعارات. يجب تفعيلها من إعدادات المتصفح للاستمرار في استخدام التطبيق."
+              : "الإشعارات ضرورية لتلقي الطلبات والردود. فعّلها الآن للحصول على تجربة كاملة."
+            }
+          </p>
+
+          {/* الأزرار */}
+          {isDenied ? (
+            <div className="space-y-3">
+              <p className="text-yellow-400 text-xs">
+                📱 اذهب إلى إعدادات المتصفح → الموقع → السماح بالإشعارات
+              </p>
               <Button
-                onClick={requestPermission}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => window.location.reload()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3"
               >
-                تفعيل
-              </Button>
-              <Button
-                onClick={() => setShowPrompt(false)}
-                size="sm"
-                variant="ghost"
-                className="text-slate-400 hover:text-white"
-              >
-                لاحقاً
+                🔄 تحديث بعد التفعيل
               </Button>
             </div>
-          </div>
+          ) : (
+            <Button
+              onClick={requestPermission}
+              className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white py-3 text-lg font-medium"
+            >
+              ✅ تفعيل الإشعارات
+            </Button>
+          )}
+
+          {/* ملاحظة */}
+          <p className="text-slate-500 text-xs mt-4">
+            لن تتمكن من استلام الطلبات بدون تفعيل الإشعارات
+          </p>
         </div>
       </Card>
     </div>

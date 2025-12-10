@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
     }
 
     // التحقق من طول الرسالة
-    if (message.length < 10 || message.length > 500) {
+    if (message.length < 2 || message.length > 500) {
       return NextResponse.json(
-        { error: "يجب أن تكون الرسالة بين 10 و 500 حرف" },
+        { error: "يجب أن تكون الرسالة بين 2 و 500 حرف" },
         { status: 400 }
       )
     }
