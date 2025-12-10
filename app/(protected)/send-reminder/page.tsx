@@ -1,0 +1,397 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Label } from "@/components/ui/label"
+import { SendIcon, ArrowRightIcon, SearchIcon } from "@/components/icons"
+import { supabase } from "@/lib/supabase/client"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/toast-notification"
+
+// أنواع التنبيهات
+const REMINDER_TYPES = [
+  { id: "wedding", label: "دعوة زواج", emoji: "💍", description: "دعوة لحضور حفل زواج" },
+  { id: "meeting", label: "اجتماع", emoji: "📅", description: "موعد اجتماع أو لقاء" },
+  { id: "callback", label: "رد على اتصال", emoji: "📞", description: "تذكير برد على مكالمة" },
+  { id: "birthday", label: "عيد ميلاد", emoji: "🎂", description: "دعوة لحضور عيد ميلاد" },
+  { id: "event", label: "مناسبة", emoji: "🎉", description: "دعوة لمناسبة عامة" },
+  { id: "general", label: "تذكير عام", emoji: "⏰", description: "تذكير بموعد أو مهمة" },
+]
+
+// خيارات التذكير
+const REMIND_OPTIONS = [
+  { value: 1, label: "قبل ساعة" },
+  { value: 3, label: "قبل 3 ساعات" },
+  { value: 24, label: "قبل يوم" },
+  { value: 168, label: "قبل أسبوع" },
+]
+
+interface Contact {
+  id: string
+  name: string
+  avatar?: string
+  phone?: string
+}
+
+export default function SendReminderPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedUserId = searchParams?.get("to")
+  const { user } = useAuth()
+  const { showToast } = useToast()
+
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // حالة النموذج
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [selectedType, setSelectedType] = useState<string | null>(null)
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [eventDate, setEventDate] = useState("")
+  const [eventTime, setEventTime] = useState("")
+  const [location, setLocation] = useState("")
+  const [remindHours, setRemindHours] = useState<number[]>([1, 24])
+
+  useEffect(() => {
+    if (user) loadContacts()
+  }, [user])
+
+  useEffect(() => {
+    if (preselectedUserId && contacts.length > 0) {
+      const contact = contacts.find(c => c.id === preselectedUserId)
+      if (contact) setSelectedContact(contact)
+    }
+  }, [preselectedUserId, contacts])
+
+  const loadContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("contact_user_id")
+        .eq("user_id", user?.id)
+
+      if (error) {
+        setLoading(false)
+        return
+      }
+
+      // جلب معلومات جهات الاتصال
+      const contactIds = data?.map(c => c.contact_user_id) || []
+      const contactsList: Contact[] = []
+
+      await Promise.all(
+        contactIds.map(async (id) => {
+          const { data: userData } = await supabase.rpc("search_user_by_id", { input_user_id: id })
+          if (userData && userData.length > 0) {
+            contactsList.push({
+              id,
+              name: userData[0].full_name || "مستخدم",
+              avatar: userData[0].avatar_url,
+              phone: userData[0].phone_number
+            })
+          }
+        })
+      )
+
+      setContacts(contactsList)
+    } catch (err) {
+      console.error("Error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!selectedContact || !selectedType || !title || !eventDate || !eventTime) {
+      showToast({ title: "⚠️ تنبيه", message: "يرجى ملء جميع الحقول المطلوبة", type: "error" })
+      return
+    }
+
+    setSending(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        showToast({ title: "⚠️ تنبيه", message: "يجب تسجيل الدخول", type: "error" })
+        return
+      }
+
+      // دمج التاريخ والوقت
+      const eventDateTime = new Date(`${eventDate}T${eventTime}`)
+
+      const response = await fetch("/api/reminders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          recipient_id: selectedContact.id,
+          reminder_type: selectedType,
+          title,
+          description,
+          event_date: eventDateTime.toISOString(),
+          location,
+          remind_before_hours: remindHours
+        })
+      })
+
+      if (response.ok) {
+        showToast({
+          title: "✅ تم الإرسال",
+          message: `تم إرسال التنبيه لـ ${selectedContact.name}`,
+          type: "success",
+          action: {
+            label: "عرض التنبيهات",
+            onClick: () => router.push("/reminders?tab=sent")
+          }
+        })
+        router.push("/reminders?tab=sent")
+      } else {
+        const data = await response.json()
+        showToast({ title: "❌ خطأ", message: data.error || "حدث خطأ", type: "error" })
+      }
+    } catch (err) {
+      console.error("Error:", err)
+      showToast({ title: "❌ خطأ", message: "حدث خطأ غير متوقع", type: "error" })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const filteredContacts = contacts.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.phone?.includes(searchQuery)
+  )
+
+  // الحد الأدنى للتاريخ (اليوم)
+  const minDate = new Date().toISOString().split("T")[0]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowRightIcon className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">📤 إرسال تنبيه</h1>
+          <p className="text-muted-foreground text-sm">أرسل دعوة أو تذكير</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Step 1: Select Contact */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">👤 اختر المستلم</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {selectedContact ? (
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarImage src={selectedContact.avatar} />
+                    <AvatarFallback>{selectedContact.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{selectedContact.name}</p>
+                    <p className="text-xs text-muted-foreground">{selectedContact.phone}</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedContact(null)}>
+                  تغيير
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <SearchIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="بحث في جهات الاتصال..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pr-10"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {filteredContacts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">لا توجد جهات اتصال</p>
+                  ) : (
+                    filteredContacts.map(contact => (
+                      <div
+                        key={contact.id}
+                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                        onClick={() => setSelectedContact(contact)}
+                      >
+                        <Avatar>
+                          <AvatarImage src={contact.avatar} />
+                          <AvatarFallback>{contact.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{contact.name}</p>
+                          <p className="text-xs text-muted-foreground">{contact.phone}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Step 2: Select Type */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">📋 نوع التنبيه</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {REMINDER_TYPES.map(type => (
+                <div
+                  key={type.id}
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                    selectedType === type.id
+                      ? "border-primary bg-primary/10"
+                      : "border-transparent bg-muted hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setSelectedType(type.id)}
+                >
+                  <span className="text-3xl">{type.emoji}</span>
+                  <p className="font-medium mt-2 text-sm">{type.label}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 3: Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">📝 التفاصيل</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="title">العنوان *</Label>
+              <Input
+                id="title"
+                placeholder="مثال: زواج أحمد"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="description">الوصف (اختياري)</Label>
+              <Textarea
+                id="description"
+                placeholder="تفاصيل إضافية..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="date">التاريخ *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  min={minDate}
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="time">الوقت *</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={eventTime}
+                  onChange={(e) => setEventTime(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="location">المكان (اختياري)</Label>
+              <Input
+                id="location"
+                placeholder="مثال: قاعة النخيل - الرياض"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 4: Reminder Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">🔔 تذكير المستلم قبل</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {REMIND_OPTIONS.map(opt => (
+                <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={remindHours.includes(opt.value)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setRemindHours([...remindHours, opt.value])
+                      } else {
+                        setRemindHours(remindHours.filter(h => h !== opt.value))
+                      }
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Submit */}
+        <Button
+          type="submit"
+          className="w-full h-12 text-lg"
+          disabled={!selectedContact || !selectedType || !title || !eventDate || !eventTime || sending}
+        >
+          {sending ? (
+            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <SendIcon className="ml-2 h-5 w-5" />
+              إرسال التنبيه
+            </>
+          )}
+        </Button>
+      </form>
+    </div>
+  )
+}
+

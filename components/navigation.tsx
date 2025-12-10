@@ -3,14 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon } from "@/components/icons"
+import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon, MessageSquareIcon, BellIcon, CalendarIcon } from "@/components/icons"
 import { useAuth } from "@/contexts/auth-context"
 
 const navItems = [
   { href: "/dashboard", label: "الرئيسية", icon: HomeIcon },
+  { href: "/chat", label: "المحادثات", icon: MessageSquareIcon },
+  { href: "/reminders", label: "التنبيهات", icon: CalendarIcon },
   { href: "/contacts", label: "جهات الاتصال", icon: UsersIcon },
-  { href: "/send-request", label: "إرسال طلب", icon: SendIcon },
-  { href: "/requests", label: "الطلبات", icon: InboxIcon },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ]
 
