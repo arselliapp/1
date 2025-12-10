@@ -39,6 +39,15 @@ export default function RequestsPage() {
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({})
   const [openReplyBoxes, setOpenReplyBoxes] = useState<Record<string, boolean>>({})
   const [contactStatus, setContactStatus] = useState<Record<string, boolean>>({})
+  
+  // نافذة التأكيد
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean
+    title: string
+    message: string
+    type: "accept" | "reject"
+    onConfirm: () => void
+  } | null>(null)
 
   // استخدام ref للتحقق من وجود صندوق رد مفتوح (لتجنب إعادة تشغيل useEffect)
   const openReplyBoxesRef = useRef(openReplyBoxes)
@@ -297,64 +306,87 @@ export default function RequestsPage() {
   }
 
   // قبول جميع الطلبات المعلقة
-  const handleAcceptAll = async () => {
+  const handleAcceptAll = () => {
     const pendingRequests = receivedRequests.filter(r => r.status === "pending")
     if (pendingRequests.length === 0) return
 
-    if (!confirm(`هل أنت متأكد من قبول ${pendingRequests.length} طلب؟`)) return
-
-    setProcessingAll(true)
-    try {
-      await Promise.all(
-        pendingRequests.map(request =>
-          supabase
-            .from("requests")
-            .update({ status: "accepted", updated_at: new Date().toISOString() })
-            .eq("id", request.id)
-        )
-      )
-      loadRequests()
-    } catch (err) {
-      console.error("Error accepting all:", err)
-      showToast({
-        title: "❌ خطأ",
-        message: "حدث خطأ أثناء قبول الطلبات",
-        type: "error"
-      })
-    } finally {
-      setProcessingAll(false)
-    }
+    setConfirmDialog({
+      show: true,
+      title: "✅ قبول جميع الطلبات",
+      message: `هل أنت متأكد من قبول ${pendingRequests.length} طلب؟`,
+      type: "accept",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setProcessingAll(true)
+        try {
+          await Promise.all(
+            pendingRequests.map(request =>
+              supabase
+                .from("requests")
+                .update({ status: "accepted", updated_at: new Date().toISOString() })
+                .eq("id", request.id)
+            )
+          )
+          showToast({
+            title: "✅ تم القبول",
+            message: `تم قبول ${pendingRequests.length} طلب بنجاح`,
+            type: "success"
+          })
+          loadRequests()
+        } catch (err) {
+          console.error("Error accepting all:", err)
+          showToast({
+            title: "❌ خطأ",
+            message: "حدث خطأ أثناء قبول الطلبات",
+            type: "error"
+          })
+        } finally {
+          setProcessingAll(false)
+        }
+      }
+    })
   }
 
   // رفض جميع الطلبات المعلقة
-  const handleRejectAll = async () => {
+  const handleRejectAll = () => {
     const pendingRequests = receivedRequests.filter(r => r.status === "pending")
     if (pendingRequests.length === 0) return
 
-    // نستخدم window.confirm مؤقتاً للتأكيد
-    if (!window.confirm(`هل أنت متأكد من رفض ${pendingRequests.length} طلب؟`)) return
-
-    setProcessingAll(true)
-    try {
-      await Promise.all(
-        pendingRequests.map(request =>
-          supabase
-            .from("requests")
-            .update({ status: "rejected", updated_at: new Date().toISOString() })
-            .eq("id", request.id)
-        )
-      )
-      loadRequests()
-    } catch (err) {
-      console.error("Error rejecting all:", err)
-      showToast({
-        title: "❌ خطأ",
-        message: "حدث خطأ أثناء رفض الطلبات",
-        type: "error"
-      })
-    } finally {
-      setProcessingAll(false)
-    }
+    setConfirmDialog({
+      show: true,
+      title: "❌ رفض جميع الطلبات",
+      message: `هل أنت متأكد من رفض ${pendingRequests.length} طلب؟`,
+      type: "reject",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setProcessingAll(true)
+        try {
+          await Promise.all(
+            pendingRequests.map(request =>
+              supabase
+                .from("requests")
+                .update({ status: "rejected", updated_at: new Date().toISOString() })
+                .eq("id", request.id)
+            )
+          )
+          showToast({
+            title: "✅ تم الرفض",
+            message: `تم رفض ${pendingRequests.length} طلب`,
+            type: "success"
+          })
+          loadRequests()
+        } catch (err) {
+          console.error("Error rejecting all:", err)
+          showToast({
+            title: "❌ خطأ",
+            message: "حدث خطأ أثناء رفض الطلبات",
+            type: "error"
+          })
+        } finally {
+          setProcessingAll(false)
+        }
+      }
+    })
   }
 
   // ترتيب الطلبات حسب آخر تحديث (آخر رد بالأعلى)
@@ -678,12 +710,44 @@ export default function RequestsPage() {
     )
   }
 
+  // مكون نافذة التأكيد
+  const ConfirmDialog = () => {
+    if (!confirmDialog?.show) return null
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <h3 className="text-lg font-bold text-white mb-2">{confirmDialog.title}</h3>
+          <p className="text-slate-300 mb-6">{confirmDialog.message}</p>
+          <div className="flex gap-3">
+            <Button
+              className={`flex-1 ${confirmDialog.type === "accept" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+              onClick={confirmDialog.onConfirm}
+            >
+              {confirmDialog.type === "accept" ? "نعم، قبول الكل" : "نعم، رفض الكل"}
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              onClick={() => setConfirmDialog(null)}
+            >
+              إلغاء
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className="space-y-6 animate-in fade-in duration-500 text-right"
       dir="rtl"
       style={{ direction: "rtl", textAlign: "right" }}
     >
+      {/* نافذة التأكيد */}
+      <ConfirmDialog />
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
