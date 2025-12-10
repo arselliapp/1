@@ -13,8 +13,19 @@ export function NotificationWatcher() {
     const audioContextRef = useRef<AudioContext | null>(null)
     const permissionRequestedRef = useRef(false)
 
-    // تشغيل صوت الإشعار - صوت عالي وواضح
+    // تشغيل صوت الإشعار - صوت واضح ومميز
     const playNotificationSound = () => {
+        // استخدام AudioContext مباشرة - الأكثر موثوقية
+        playAudioContextSound()
+        
+        // أيضاً محاولة تشغيل اهتزاز للجوال
+        if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200])
+        }
+    }
+
+    // الصوت باستخدام AudioContext كبديل
+    const playAudioContextSound = () => {
         try {
             // إنشاء audio context إذا لم يكن موجوداً
             if (!audioContextRef.current) {
@@ -60,7 +71,7 @@ export function NotificationWatcher() {
                 oscillator.stop(startTime + 0.15)
             }
         } catch (err) {
-            // Silent error handling
+            console.log("Sound playback failed")
         }
     }
 

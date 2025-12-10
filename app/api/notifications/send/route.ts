@@ -65,16 +65,25 @@ export async function POST(request: Request) {
 
     console.log(`✅ Found ${subscriptions?.length || 0} subscription(s) for user: ${userId}`)
 
+    // تحديد الرابط المناسب بناءً على نوع الإشعار
+    const notificationType = data?.type || "general"
+    let defaultUrl = "/dashboard"
+    if (notificationType === "reminder" || notificationType === "request") {
+      defaultUrl = "/reminders"
+    } else if (notificationType === "message") {
+      defaultUrl = "/chat"
+    }
+
     // إرسال الإشعار لجميع الأجهزة
     const payload = JSON.stringify({
       title: title || "إشعار جديد",
       body: body || "لديك إشعار جديد",
       icon: "/icon-192x192.png",
       badge: "/icon-192x192.png",
-      tag: data?.requestId || "notification",
+      tag: data?.requestId || data?.reminderId || "notification",
       requireInteraction: true,
       data: {
-        url: url || "/requests",
+        url: url || defaultUrl,
         ...data,
       },
     })
@@ -115,9 +124,9 @@ export async function POST(request: Request) {
         user_id: userId,
         title: title || "إشعار جديد",
         body: body || "لديك إشعار جديد",
-        type: data?.type || "request",
+        type: data?.type || "general",
         data: data || {},
-        url: url || "/requests",
+        url: url || defaultUrl,
         is_read: false,
       }
       

@@ -132,8 +132,8 @@ export async function POST(request: NextRequest) {
         user_id: recipient_id,
         title: `${typeInfo.emoji} ${senderName} ${typeInfo.title}`,
         body: message.length > 80 ? message.substring(0, 80) + "..." : message,
-        type: "request",
-        url: "/requests",
+        type: "reminder",
+        url: "/reminders?tab=pending",
         data: {
           requestId: data.id,
           senderId: session.user.id,

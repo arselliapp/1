@@ -103,9 +103,9 @@ export async function POST(request: NextRequest) {
         const notificationData = {
             user_id: originalRequest.sender_id,
             title: `💬 رد جديد من ${responderName}`,
-            body: `تم الرد على طلبك - افتح صفحة الطلبات الواردة لعرض الرد`,
-            type: "request",
-            url: "/requests?tab=received",
+            body: `تم الرد على طلبك - اضغط لعرض الرد`,
+            type: "reminder",
+            url: "/reminders?tab=sent",
             data: {
                 requestId: request_id,
                 responderId: session.user.id,
