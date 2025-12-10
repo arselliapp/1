@@ -106,18 +106,34 @@ export default function SettingsPage() {
     }
   }
 
+  // تحويل الأرقام العربية إلى إنجليزية
+  const normalizePhoneNumber = (phone: string): string => {
+    const arabicNumerals = '٠١٢٣٤٥٦٧٨٩'
+    const englishNumerals = '0123456789'
+    
+    let normalized = phone
+    for (let i = 0; i < arabicNumerals.length; i++) {
+      normalized = normalized.replace(new RegExp(arabicNumerals[i], 'g'), englishNumerals[i])
+    }
+    
+    return normalized.replace(/[\s\-\(\)]/g, '').trim()
+  }
+
   const handleSaveProfile = async () => {
     setIsSaving(true)
     setError(null)
     setSuccess(null)
 
-    if (requirePhone && !phoneNumber.trim()) {
+    // تحويل رقم الجوال للإنجليزية
+    const normalizedPhone = normalizePhoneNumber(phoneNumber)
+
+    if (requirePhone && !normalizedPhone) {
       setError("رقم الجوال مطلوب لإكمال تسجيل الدخول.")
       setIsSaving(false)
       return
     }
 
-    if (phoneNumber && !/^05\d{8}$/.test(phoneNumber.trim())) {
+    if (normalizedPhone && !/^05\d{8}$/.test(normalizedPhone)) {
       setError("الرجاء إدخال رقم جوال صحيح (مثال: 05xxxxxxxx)")
       setIsSaving(false)
       return
@@ -141,13 +157,13 @@ export default function SettingsPage() {
       }
 
       // Update phone if changed
-      if (phoneNumber && phoneNumber !== user?.user_metadata?.phone_number) {
+      if (normalizedPhone && normalizedPhone !== normalizePhoneNumber(user?.user_metadata?.phone_number || "")) {
         // التحقق من تكرار رقم الجوال
         const checkResponse = await fetch("/api/check-phone", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            phone_number: phoneNumber.trim(),
+            phone_number: normalizedPhone,
             user_id: user?.id
           })
         })
@@ -160,7 +176,7 @@ export default function SettingsPage() {
           return
         }
 
-        const { error: updateError } = await updatePhoneNumber(phoneNumber.trim())
+        const { error: updateError } = await updatePhoneNumber(normalizedPhone)
         
         if (updateError) {
           setError("حدث خطأ أثناء حفظ رقم الجوال. الرجاء المحاولة مرة أخرى.")
