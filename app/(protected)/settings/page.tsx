@@ -158,6 +158,8 @@ export default function SettingsPage() {
 
       // Update phone if changed
       if (normalizedPhone && normalizedPhone !== normalizePhoneNumber(user?.user_metadata?.phone_number || "")) {
+        console.log("📱 Checking phone number:", normalizedPhone)
+        
         // التحقق من تكرار رقم الجوال
         const checkResponse = await fetch("/api/check-phone", {
           method: "POST",
@@ -169,11 +171,16 @@ export default function SettingsPage() {
         })
 
         const checkResult = await checkResponse.json()
+        console.log("📱 Check result:", checkResult)
 
         if (checkResult.exists) {
           setError("⚠️ رقم الجوال مسجل مسبقاً بحساب آخر. الرجاء استخدام رقم مختلف.")
           setIsSaving(false)
           return
+        }
+
+        if (checkResult.error) {
+          console.error("❌ Error checking phone:", checkResult.error)
         }
 
         const { error: updateError } = await updatePhoneNumber(normalizedPhone)
