@@ -51,9 +51,16 @@ export default function ChatPage() {
       }
       document.addEventListener("visibilitychange", handleVisibilityChange)
 
+      // الاستماع لحدث إشعار جديد
+      const handleNewNotification = () => {
+        loadConversations()
+      }
+      window.addEventListener('newNotification', handleNewNotification)
+
       return () => {
         clearInterval(interval)
         document.removeEventListener("visibilitychange", handleVisibilityChange)
+        window.removeEventListener('newNotification', handleNewNotification)
         updatePresence(false)
       }
     }

@@ -79,6 +79,15 @@ export default function RemindersPage() {
     if (tab) setActiveTab(tab)
   }, [searchParams])
 
+  // الاستماع لحدث إشعار جديد وتحديث البيانات
+  useEffect(() => {
+    const handleNewNotification = () => {
+      loadReminders()
+    }
+    window.addEventListener('newNotification', handleNewNotification)
+    return () => window.removeEventListener('newNotification', handleNewNotification)
+  }, [user])
+
   const loadReminders = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()

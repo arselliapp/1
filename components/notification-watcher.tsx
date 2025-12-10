@@ -5,65 +5,56 @@ import { supabase } from "@/lib/supabase/client"
 
 /**
  * مكون لمراقبة الإشعارات في كل صفحات التطبيق
- * يستخدم polling كل ثانيتين ويشغل صوت عند وصول إشعار جديد
+ * يستخدم polling ويشغل صوت عند وصول إشعار جديد
  */
 export function NotificationWatcher() {
     const knownNotificationIdsRef = useRef<Set<string>>(new Set())
     const isFirstLoadRef = useRef(true)
     const audioContextRef = useRef<AudioContext | null>(null)
-    const permissionRequestedRef = useRef(false)
 
-    // تشغيل صوت الإشعار - صوت واضح ومميز
+    // تشغيل صوت الإشعار
     const playNotificationSound = () => {
-        // استخدام AudioContext مباشرة - الأكثر موثوقية
+        // استخدام AudioContext
         playAudioContextSound()
         
-        // أيضاً محاولة تشغيل اهتزاز للجوال
+        // اهتزاز للجوال
         if (navigator.vibrate) {
             navigator.vibrate([200, 100, 200])
         }
     }
 
-    // الصوت باستخدام AudioContext كبديل
+    // الصوت باستخدام AudioContext
     const playAudioContextSound = () => {
         try {
-            // إنشاء audio context إذا لم يكن موجوداً
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
             }
 
             const audioContext = audioContextRef.current
 
-            // التأكد من أن الـ context في حالة running
             if (audioContext.state === "suspended") {
                 audioContext.resume()
             }
 
             const now = audioContext.currentTime
 
-            // تشغيل 3 نغمات قوية متتالية
             for (let i = 0; i < 3; i++) {
                 const startTime = now + (i * 0.2)
-
-                // إنشاء oscillator للصوت
                 const oscillator = audioContext.createOscillator()
                 const gainNode = audioContext.createGain()
 
                 oscillator.connect(gainNode)
                 gainNode.connect(audioContext.destination)
 
-                // نغمات إشعار قوية ومتنوعة
                 if (i === 0) {
-                    oscillator.frequency.setValueAtTime(880, startTime) // A5
+                    oscillator.frequency.setValueAtTime(880, startTime)
                 } else if (i === 1) {
-                    oscillator.frequency.setValueAtTime(1046, startTime) // C6
+                    oscillator.frequency.setValueAtTime(1046, startTime)
                 } else {
-                    oscillator.frequency.setValueAtTime(1318, startTime) // E6
+                    oscillator.frequency.setValueAtTime(1318, startTime)
                 }
 
                 oscillator.type = "sine"
-
-                // رفع الصوت للأقصى
                 gainNode.gain.setValueAtTime(1.0, startTime)
                 gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15)
 
@@ -75,9 +66,8 @@ export function NotificationWatcher() {
         }
     }
 
-    // عرض إشعار داخل التطبيق - أكثر جمالاً وتفاعلاً
-    const showInAppNotification = (title: string, body: string, type: "message" | "reminder" | "general" = "general") => {
-        // تحديد اللون والأيقونة حسب النوع
+    // عرض إشعار داخل التطبيق مع رابط التنقل
+    const showInAppNotification = (title: string, body: string, type: "message" | "reminder" | "general" = "general", url?: string) => {
         const typeStyles = {
             message: {
                 gradient: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
@@ -95,7 +85,6 @@ export function NotificationWatcher() {
         
         const style = typeStyles[type]
         
-        // إنشاء عنصر الإشعار
         const notifContainer = document.createElement('div')
         notifContainer.style.cssText = `
             position: fixed;
@@ -123,14 +112,13 @@ export function NotificationWatcher() {
                     <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">${title}</div>
                     <div style="font-size: 13px; opacity: 0.9; line-height: 1.5;">${body}</div>
                 </div>
-                <div style="font-size: 18px; opacity: 0.7; cursor: pointer; padding: 4px;" onclick="this.parentNode.parentNode.remove()">✕</div>
+                <div class="close-btn" style="font-size: 18px; opacity: 0.7; cursor: pointer; padding: 4px;">✕</div>
             </div>
             <div style="height: 3px; background: rgba(255,255,255,0.3); border-radius: 3px; margin-top: 12px; overflow: hidden;">
                 <div style="height: 100%; background: white; border-radius: 3px; animation: shrink 5s linear forwards;"></div>
             </div>
         `
 
-        // إضافة الـ CSS animation
         const styleEl = document.createElement('style')
         styleEl.textContent = `
             @keyframes slideIn {
@@ -148,13 +136,27 @@ export function NotificationWatcher() {
         `
         document.head.appendChild(styleEl)
 
-        // إضافة للصفحة
         document.body.appendChild(notifContainer)
 
-        // إغلاق عند الضغط
-        notifContainer.onclick = () => {
+        // الضغط على الإشعار للانتقال
+        notifContainer.onclick = (e) => {
+            const target = e.target as HTMLElement
+            // إذا ضغط على زر الإغلاق
+            if (target.classList.contains('close-btn')) {
+                notifContainer.style.animation = 'slideOut 0.3s ease-in'
+                setTimeout(() => notifContainer.remove(), 300)
+                return
+            }
+            
+            // الانتقال للصفحة المطلوبة مع إعادة تحميل كاملة
             notifContainer.style.animation = 'slideOut 0.3s ease-in'
-            setTimeout(() => notifContainer.remove(), 300)
+            setTimeout(() => {
+                notifContainer.remove()
+                if (url) {
+                    // استخدام window.location للتأكد من تحديث البيانات
+                    window.location.href = url
+                }
+            }, 300)
         }
 
         // إغلاق تلقائي بعد 5 ثواني
@@ -166,9 +168,8 @@ export function NotificationWatcher() {
         }, 5000)
     }
 
-    // عرض فقاعة الإشعار مع تحديد النوع
-    const showNotificationBubble = async (title: string, body: string) => {
-        // تحديد نوع الإشعار من العنوان
+    // عرض فقاعة الإشعار مع تحديد النوع والرابط
+    const showNotificationBubble = async (title: string, body: string, url?: string) => {
         let type: "message" | "reminder" | "general" = "general"
         
         if (title.includes("رسالة") || title.includes("محادثة") || title.includes("💬")) {
@@ -177,7 +178,7 @@ export function NotificationWatcher() {
             type = "reminder"
         }
         
-        showInAppNotification(title, body, type)
+        showInAppNotification(title, body, type, url)
     }
 
     useEffect(() => {
@@ -185,15 +186,12 @@ export function NotificationWatcher() {
         let isPageVisible = true
 
         const fetchNotifications = async () => {
-            // لا تجلب البيانات إذا الصفحة مخفية
             if (!isPageVisible) return
             
             try {
-                // الحصول على الـ session والـ token
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
                 if (sessionError || !session?.access_token) {
-                    // لا يوجد session - المستخدم غير مسجل دخول
                     return
                 }
 
@@ -205,35 +203,36 @@ export function NotificationWatcher() {
                 })
 
                 if (!response.ok) {
-                    // تجاهل أخطاء 401 - قد تكون الـ session منتهية
                     return
                 }
 
                 const data = await response.json()
-                const notifications: Array<{ id: string; title: string; body?: string }> = data.notifications || []
+                const notifications: Array<{ id: string; title: string; body?: string; url?: string }> = data.notifications || []
 
-                // إذا كان أول تحميل، فقط احفظ الـ IDs ولا تشغل الصوت
                 if (isFirstLoadRef.current) {
                     notifications.forEach(notif => {
                         knownNotificationIdsRef.current.add(notif.id)
                     })
                     isFirstLoadRef.current = false
                 } else {
-                    // كشف الإشعارات الجديدة فعلاً (التي لم نراها من قبل)
                     const trulyNewNotifications = notifications.filter(
                         notif => !knownNotificationIdsRef.current.has(notif.id)
                     )
 
                     if (trulyNewNotifications.length > 0) {
+                        // 1. أولاً: إطلاق حدث لتحديث الصفحة
+                        window.dispatchEvent(new CustomEvent('newNotification'))
+                        
+                        // 2. انتظر قليلاً حتى تتحدث الصفحة
+                        await new Promise(resolve => setTimeout(resolve, 500))
+                        
+                        // 3. ثم اعرض الإشعارات
                         trulyNewNotifications.forEach(notif => {
-                            // أضف الـ ID للقائمة المعروفة
                             knownNotificationIdsRef.current.add(notif.id)
 
-                            // تشغيل الصوت وعرض الفقاعة
                             playNotificationSound()
-                            showNotificationBubble(notif.title, notif.body || "")
+                            showNotificationBubble(notif.title, notif.body || "", notif.url || "/reminders?tab=pending")
 
-                            // تحديث عنوان الصفحة إذا كانت مخفية
                             if (document.hidden) {
                                 document.title = `🔔 ${notif.title}`
                             }
@@ -245,7 +244,6 @@ export function NotificationWatcher() {
             }
         }
 
-        // مراقبة visibility الصفحة
         const handleVisibility = () => {
             isPageVisible = !document.hidden
             if (!document.hidden) {
@@ -254,13 +252,9 @@ export function NotificationWatcher() {
         }
         document.addEventListener("visibilitychange", handleVisibility)
 
-        // جلب الإشعارات فوراً
         fetchNotifications()
-
-        // تحديث الإشعارات كل 10 ثواني (10000ms) بدلاً من 2
         intervalId = setInterval(fetchNotifications, 10000)
 
-        // تنظيف عند إزالة المكون
         return () => {
             document.removeEventListener("visibilitychange", handleVisibility)
             if (intervalId) {
@@ -269,8 +263,5 @@ export function NotificationWatcher() {
         }
     }, [])
 
-    // هذا المكون لا يعرض شيئاً - فقط يراقب الإشعارات
     return null
 }
-
-
