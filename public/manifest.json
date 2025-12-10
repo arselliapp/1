@@ -1,0 +1,77 @@
+{
+  "name": "أرسل لي - تطبيق إدارة جهات الاتصال",
+  "short_name": "أرسل لي",
+  "description": "تطبيق متقدم لإدارة جهات الاتصال والطلبات مع نظام مصادقة آمن",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["productivity", "social"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "جهات الاتصال",
+      "short_name": "جهات الاتصال",
+      "description": "عرض قائمة جهات الاتصال",
+      "url": "/contacts",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "الطلبات",
+      "short_name": "الطلبات",
+      "description": "عرض الطلبات الواردة",
+      "url": "/requests",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "إرسال طلب",
+      "short_name": "إرسال طلب",
+      "description": "إرسال طلب جديد",
+      "url": "/send-request",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/send-request",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "prefer_related_applications": false
+}

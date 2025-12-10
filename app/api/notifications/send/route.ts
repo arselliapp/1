@@ -1,0 +1,154 @@
+import { createRouteHandlerClient, createAdminClient } from "@/lib/supabase-server"
+import { NextResponse } from "next/server"
+import webpush from "web-push"
+
+// متغير لتتبع إعداد VAPID
+let vapidConfigured = false
+
+function setupVapid() {
+  if (vapidConfigured) return true
+  
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  
+  if (!publicKey || !privateKey) {
+    console.error("❌ VAPID keys are not configured")
+    return false
+  }
+  
+  try {
+    webpush.setVapidDetails(
+      "mailto:support@arselli.app",
+      publicKey,
+      privateKey
+    )
+    vapidConfigured = true
+    return true
+  } catch (error) {
+    console.error("❌ Error setting VAPID details:", error)
+    return false
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    console.log("🔔 Notification API called")
+    
+    // إعداد VAPID keys
+    if (!setupVapid()) {
+      return NextResponse.json({ error: "VAPID keys not configured" }, { status: 500 })
+    }
+
+    const supabase = createRouteHandlerClient()
+    const adminClient = createAdminClient()
+    
+    // الحصول على بيانات الإشعار
+    const { userId, title, body, url, data } = await request.json()
+
+    if (!userId) {
+      console.error("❌ User ID is required")
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    }
+
+    console.log(`📤 Sending notification to user: ${userId}`)
+    console.log(`Title: ${title}, Body: ${body}`)
+
+    // الحصول على اشتراكات المستخدم المستهدف
+    const { data: subscriptions, error: fetchError } = await supabase
+      .from("push_subscriptions")
+      .select("subscription")
+      .eq("user_id", userId)
+
+    if (fetchError) {
+      console.error("❌ Error fetching subscriptions:", fetchError)
+    }
+
+    console.log(`✅ Found ${subscriptions?.length || 0} subscription(s) for user: ${userId}`)
+
+    // إرسال الإشعار لجميع الأجهزة
+    const payload = JSON.stringify({
+      title: title || "إشعار جديد",
+      body: body || "لديك إشعار جديد",
+      icon: "/icon-192x192.png",
+      badge: "/icon-192x192.png",
+      tag: data?.requestId || "notification",
+      requireInteraction: true,
+      data: {
+        url: url || "/requests",
+        ...data,
+      },
+    })
+
+    let successCount = 0
+    let sentToSubscriptions = 0
+
+    // محاولة إرسال إشعارات Push
+    if (subscriptions && subscriptions.length > 0) {
+      const sendPromises = subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub.subscription, payload)
+          sentToSubscriptions++
+          return { success: true }
+        } catch (error: any) {
+          console.error("Error sending notification:", error)
+          
+          // حذف الاشتراك إذا كان غير صالح
+          if (error.statusCode === 410 || error.statusCode === 404) {
+            await supabase
+              .from("push_subscriptions")
+              .delete()
+              .eq("endpoint", sub.subscription.endpoint)
+          }
+          
+          return { success: false, error: error.message }
+        }
+      })
+
+      const results = await Promise.all(sendPromises)
+      successCount = results.filter((r) => r.success).length
+    }
+
+    // حفظ الإشعار في قاعدة البيانات كـ fallback
+    console.log("💾 Saving notification to database...")
+    try {
+      const insertData = {
+        user_id: userId,
+        title: title || "إشعار جديد",
+        body: body || "لديك إشعار جديد",
+        type: data?.type || "request",
+        data: data || {},
+        url: url || "/requests",
+        is_read: false,
+      }
+      
+      console.log("Insert data:", JSON.stringify(insertData))
+      
+      const { data: insertedNotification, error: dbError } = await adminClient
+        .from("notifications")
+        .insert(insertData)
+        .select()
+        .single()
+      
+      if (dbError) {
+        console.error("❌ Error saving notification to DB:", dbError)
+        console.error("Error code:", dbError.code)
+        console.error("Error message:", dbError.message)
+      } else {
+        console.log("✅ Notification saved to database:", insertedNotification?.id)
+      }
+    } catch (err) {
+      console.error("❌ Error saving notification:", err)
+    }
+
+    return NextResponse.json({
+      success: true,
+      sent: successCount,
+      total: subscriptions?.length || 0,
+      savedToDb: true,
+    })
+  } catch (error) {
+    console.error("Error in send notification route:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
