@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { SendIcon, InboxIcon, ClockIcon, CheckCircleIcon, XCircleIcon, MessageSquareIcon, PhoneIcon, HeartIcon, UsersIcon, BellIcon, UserPlusIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/toast-notification"
 
 interface Request {
   id: string
@@ -28,6 +29,7 @@ interface Request {
 
 export default function RequestsPage() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const searchParams = useSearchParams()
   const defaultTab = searchParams?.get('tab') === 'sent' ? 'sent' : 'received'
   const [requests, setRequests] = useState<Request[]>([])
@@ -191,7 +193,11 @@ export default function RequestsPage() {
       }
 
       if (existingContacts && existingContacts.length > 0) {
-        alert("هذا الشخص موجود بالفعل في جهات الاتصال")
+        showToast({
+          title: "⚠️ تنبيه",
+          message: "هذا الشخص موجود بالفعل في جهات الاتصال",
+          type: "error"
+        })
         return
       }
 
@@ -203,9 +209,17 @@ export default function RequestsPage() {
 
       if (error) {
         console.error("Error adding contact:", error)
-        alert("حدث خطأ أثناء إضافة جهة الاتصال")
+        showToast({
+          title: "❌ خطأ",
+          message: "حدث خطأ أثناء إضافة جهة الاتصال",
+          type: "error"
+        })
       } else {
-        alert(`تم إضافة ${userName} إلى جهات الاتصال بنجاح!`)
+        showToast({
+          title: "✅ تمت الإضافة",
+          message: `تم إضافة ${userName} إلى جهات الاتصال بنجاح!`,
+          type: "success"
+        })
         // تحديث حالة جهة الاتصال
         const requestId = requests.find(r => r.from.id === userId)?.id
         if (requestId) {
@@ -214,7 +228,11 @@ export default function RequestsPage() {
       }
     } catch (err) {
       console.error("Error:", err)
-      alert("حدث خطأ غير متوقع")
+      showToast({
+        title: "❌ خطأ",
+        message: "حدث خطأ غير متوقع",
+        type: "error"
+      })
     }
   }
 
@@ -298,7 +316,11 @@ export default function RequestsPage() {
       loadRequests()
     } catch (err) {
       console.error("Error accepting all:", err)
-      alert("حدث خطأ أثناء قبول الطلبات")
+      showToast({
+        title: "❌ خطأ",
+        message: "حدث خطأ أثناء قبول الطلبات",
+        type: "error"
+      })
     } finally {
       setProcessingAll(false)
     }
@@ -309,7 +331,8 @@ export default function RequestsPage() {
     const pendingRequests = receivedRequests.filter(r => r.status === "pending")
     if (pendingRequests.length === 0) return
 
-    if (!confirm(`هل أنت متأكد من رفض ${pendingRequests.length} طلب؟`)) return
+    // نستخدم window.confirm مؤقتاً للتأكيد
+    if (!window.confirm(`هل أنت متأكد من رفض ${pendingRequests.length} طلب؟`)) return
 
     setProcessingAll(true)
     try {
@@ -324,7 +347,11 @@ export default function RequestsPage() {
       loadRequests()
     } catch (err) {
       console.error("Error rejecting all:", err)
-      alert("حدث خطأ أثناء رفض الطلبات")
+      showToast({
+        title: "❌ خطأ",
+        message: "حدث خطأ أثناء رفض الطلبات",
+        type: "error"
+      })
     } finally {
       setProcessingAll(false)
     }
@@ -545,7 +572,11 @@ export default function RequestsPage() {
                             try {
                               const { data: { session } } = await supabase.auth.getSession()
                               if (!session) {
-                                alert("يجب تسجيل الدخول أولاً")
+                                showToast({
+                                  title: "⚠️ تنبيه",
+                                  message: "يجب تسجيل الدخول أولاً",
+                                  type: "error"
+                                })
                                 return
                               }
 
@@ -564,19 +595,27 @@ export default function RequestsPage() {
                               const result = await response.json()
 
                               if (!response.ok) {
-                                alert(`خطأ: ${result.error || "حدث خطأ أثناء إرسال الرد"}`)
+                                showToast({
+                                  title: "❌ خطأ",
+                                  message: result.error || "حدث خطأ أثناء إرسال الرد",
+                                  type: "error"
+                                })
                               } else {
-                                if (result.notificationSent) {
-                                  alert(`تم إرسال الرد بنجاح! ✅\nتم إرسال إشعار للمرسل (ID: ${result.notificationId})`)
-                                } else {
-                                  alert(`تم إرسال الرد ✅ لكن فشل الإشعار ❌\nالخطأ: ${result.notificationError}\nSender ID: ${result.senderId}`)
-                                }
+                                showToast({
+                                  title: "✅ تم إرسال الرد",
+                                  message: "تم إرسال ردك بنجاح وسيصل إشعار للمرسل",
+                                  type: "success"
+                                })
                                 setOpenReplyBoxes(prev => ({ ...prev, [request.id]: false }))
                                 setReplyTexts(prev => ({ ...prev, [request.id]: "" }))
                                 loadRequests()
                               }
                             } catch (err) {
-                              alert(`خطأ غير متوقع: ${err}`)
+                              showToast({
+                                title: "❌ خطأ غير متوقع",
+                                message: "حدث خطأ أثناء إرسال الرد",
+                                type: "error"
+                              })
                             }
                           }}
                         >
