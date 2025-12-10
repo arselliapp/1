@@ -157,10 +157,11 @@ export default function SettingsPage() {
       }
 
       // Update phone if changed
-      if (normalizedPhone && normalizedPhone !== normalizePhoneNumber(user?.user_metadata?.phone_number || "")) {
+      if (normalizedPhone) {
         console.log("📱 Checking phone number:", normalizedPhone)
+        console.log("📱 Current user phone:", user?.user_metadata?.phone_number)
         
-        // التحقق من تكرار رقم الجوال
+        // التحقق من تكرار رقم الجوال دائماً (حتى لو لم يتغير الرقم ظاهرياً)
         const checkResponse = await fetch("/api/check-phone", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -175,22 +176,29 @@ export default function SettingsPage() {
 
         if (checkResult.exists) {
           setError("⚠️ رقم الجوال مسجل مسبقاً بحساب آخر. الرجاء استخدام رقم مختلف.")
+          setPhoneNumber(user?.user_metadata?.phone_number || "") // إرجاع الرقم الأصلي
           setIsSaving(false)
           return
         }
 
         if (checkResult.error) {
           console.error("❌ Error checking phone:", checkResult.error)
-        }
-
-        const { error: updateError } = await updatePhoneNumber(normalizedPhone)
-        
-        if (updateError) {
-          setError("حدث خطأ أثناء حفظ رقم الجوال. الرجاء المحاولة مرة أخرى.")
+          setError("حدث خطأ أثناء التحقق من رقم الجوال")
           setIsSaving(false)
           return
         }
-        hasChanges = true
+
+        // إذا الرقم لم يتغير، لا تحدّث
+        if (normalizedPhone !== normalizePhoneNumber(user?.user_metadata?.phone_number || "")) {
+          const { error: updateError } = await updatePhoneNumber(normalizedPhone)
+          
+          if (updateError) {
+            setError("حدث خطأ أثناء حفظ رقم الجوال. الرجاء المحاولة مرة أخرى.")
+            setIsSaving(false)
+            return
+          }
+          hasChanges = true
+        }
       }
 
       if (hasChanges) {

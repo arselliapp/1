@@ -10,6 +10,7 @@ import { TrashIcon, ShieldIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/components/toast-notification"
 
 // الرقم السري للوحة التحكم
 const ADMIN_PIN = "1486"
@@ -41,6 +42,7 @@ interface User {
 export default function AdminPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { showToast } = useToast()
   const [contacts, setContacts] = useState<Contact[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +56,15 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [pin, setPin] = useState("")
   const [pinError, setPinError] = useState("")
+
+  // حالة نافذة التأكيد
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    type: "contact" | "user"
+  } | null>(null)
 
   // التحقق من الـ session المحفوظة
   useEffect(() => {
@@ -143,57 +154,91 @@ export default function AdminPage() {
   }
 
   const handleDeleteContact = async (contactId: string) => {
-    if (!confirm("هل أنت متأكد من حذف جهة الاتصال هذه؟")) {
-      return
-    }
+    setConfirmDialog({
+      show: true,
+      title: "حذف جهة الاتصال",
+      message: "هل أنت متأكد من حذف جهة الاتصال هذه؟",
+      type: "contact",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          const response = await fetch("/api/admin/contacts", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: contactId })
+          })
 
-    try {
-      const response = await fetch("/api/admin/contacts", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: contactId })
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.error) {
-        console.error("Error deleting contact:", data.error)
-        alert("حدث خطأ أثناء حذف جهة الاتصال")
-      } else {
-        alert("تم حذف جهة الاتصال بنجاح")
-        loadData()
+          if (data.error) {
+            console.error("Error deleting contact:", data.error)
+            showToast({
+              title: "❌ خطأ",
+              message: "حدث خطأ أثناء حذف جهة الاتصال",
+              type: "error"
+            })
+          } else {
+            showToast({
+              title: "✅ تم الحذف",
+              message: "تم حذف جهة الاتصال بنجاح",
+              type: "success"
+            })
+            loadData()
+          }
+        } catch (err) {
+          console.error("Error:", err)
+          showToast({
+            title: "❌ خطأ",
+            message: "حدث خطأ غير متوقع",
+            type: "error"
+          })
+        }
       }
-    } catch (err) {
-      console.error("Error:", err)
-      alert("حدث خطأ غير متوقع")
-    }
+    })
   }
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("⚠️ تحذير: سيتم حذف الحساب بالكامل وجميع بياناته (الإضافات والطلبات). هل أنت متأكد؟")) {
-      return
-    }
+    setConfirmDialog({
+      show: true,
+      title: "⚠️ تحذير: حذف الحساب",
+      message: "سيتم حذف الحساب بالكامل وجميع بياناته (الإضافات والطلبات). هل أنت متأكد؟",
+      type: "user",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          const response = await fetch("/api/admin/users", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: userId })
+          })
 
-    try {
-      const response = await fetch("/api/admin/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: userId })
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.error) {
-        console.error("Error deleting user:", data.error)
-        alert("حدث خطأ أثناء حذف المستخدم")
-      } else {
-        alert("تم حذف المستخدم بنجاح")
-        loadData()
+          if (data.error) {
+            console.error("Error deleting user:", data.error)
+            showToast({
+              title: "❌ خطأ",
+              message: "حدث خطأ أثناء حذف المستخدم",
+              type: "error"
+            })
+          } else {
+            showToast({
+              title: "✅ تم الحذف",
+              message: "تم حذف المستخدم بنجاح",
+              type: "success"
+            })
+            loadData()
+          }
+        } catch (err) {
+          console.error("Error:", err)
+          showToast({
+            title: "❌ خطأ",
+            message: "حدث خطأ غير متوقع",
+            type: "error"
+          })
+        }
       }
-    } catch (err) {
-      console.error("Error:", err)
-      alert("حدث خطأ غير متوقع")
-    }
+    })
   }
 
   const formatDate = (dateString: string) => {
@@ -215,6 +260,36 @@ export default function AdminPage() {
     }
     const s = statusMap[status] || { label: status, variant: "secondary" }
     return <Badge variant={s.variant} className="text-xs">{s.label}</Badge>
+  }
+
+  // نافذة التأكيد المخصصة
+  const ConfirmDialog = () => {
+    if (!confirmDialog?.show) return null
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <h3 className="text-lg font-bold text-white mb-2">{confirmDialog.title}</h3>
+          <p className="text-slate-300 mb-6">{confirmDialog.message}</p>
+          <div className="flex gap-3">
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={confirmDialog.onConfirm}
+            >
+              تأكيد الحذف
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              onClick={() => setConfirmDialog(null)}
+            >
+              إلغاء
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // شاشة إدخال الرقم السري
@@ -278,6 +353,8 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      <ConfirmDialog />
+      
       <div className="flex items-center gap-3 mb-6">
         <ShieldIcon className="h-8 w-8 text-primary" />
         <h1 className="text-3xl font-bold">لوحة التحكم</h1>
