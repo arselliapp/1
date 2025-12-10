@@ -1,7 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { supabase, type User, type Session } from "@/lib/supabase/client"
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
+import { supabase, saveDeviceInfo, getStoredSession, refreshSession, type User, type Session } from "@/lib/supabase/client"
 
 interface AuthContextType {
   user: User | null
@@ -19,31 +19,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSession(session as unknown as Session)
-        setUser(session.user as unknown as User)
+  // دالة لتحديث الجلسة تلقائياً
+  const handleSessionRefresh = useCallback(async () => {
+    try {
+      const refreshedSession = await refreshSession()
+      if (refreshedSession) {
+        setSession(refreshedSession as unknown as Session)
+        setUser(refreshedSession.user as unknown as User)
+        console.log("✅ Session refreshed successfully")
       }
-      setLoading(false)
-    })
+    } catch (err) {
+      console.error("Error refreshing session:", err)
+    }
+  }, [])
+
+  useEffect(() => {
+    let refreshInterval: NodeJS.Timeout | null = null
+
+    // Get initial session
+    const initSession = async () => {
+      try {
+        // محاولة استرجاع الجلسة المحفوظة
+        const storedSession = await getStoredSession()
+        
+        if (storedSession) {
+          setSession(storedSession as unknown as Session)
+          setUser(storedSession.user as unknown as User)
+          
+          // حفظ معلومات الجهاز
+          saveDeviceInfo()
+          
+          // تحديث الجلسة إذا كانت قديمة (أكثر من 30 دقيقة)
+          const expiresAt = storedSession.expires_at
+          if (expiresAt) {
+            const expiresTime = new Date(expiresAt * 1000).getTime()
+            const now = Date.now()
+            const thirtyMinutes = 30 * 60 * 1000
+            
+            if (expiresTime - now < thirtyMinutes) {
+              console.log("🔄 Session expiring soon, refreshing...")
+              await handleSessionRefresh()
+            }
+          }
+        }
+        
+        setLoading(false)
+      } catch (err) {
+        console.error("Error initializing session:", err)
+        setLoading(false)
+      }
+    }
+
+    initSession()
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("🔐 Auth event:", event)
+      
       if (session) {
         setSession(session as unknown as Session)
         setUser(session.user as unknown as User)
+        
+        // حفظ معلومات الجهاز عند تسجيل الدخول
+        if (event === 'SIGNED_IN') {
+          saveDeviceInfo()
+          console.log("✅ User signed in, device info saved")
+        }
       } else {
         setSession(null)
         setUser(null)
       }
+      
+      setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
+    // تحديث الجلسة كل 10 دقائق
+    refreshInterval = setInterval(() => {
+      if (session) {
+        handleSessionRefresh()
+      }
+    }, 10 * 60 * 1000) // 10 دقائق
+
+    return () => {
+      subscription.unsubscribe()
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
+    }
+  }, [handleSessionRefresh])
 
   const signInWithGoogle = async () => {
     setLoading(true)
@@ -52,6 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          // حفظ الجلسة لفترة طويلة
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       })
       if (error) throw error
@@ -84,8 +154,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setLoading(false)
       
-      // مسح جميع بيانات التخزين
-      localStorage.clear()
+      // مسح بيانات التخزين (ما عدا بعض الإعدادات)
+      const keysToKeep = ['admin_pin'] // الإعدادات التي نريد الاحتفاظ بها
+      const allKeys = Object.keys(localStorage)
+      allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+          localStorage.removeItem(key)
+        }
+      })
       sessionStorage.clear()
       
       // مسح الـ cache
