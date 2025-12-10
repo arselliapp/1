@@ -274,13 +274,29 @@ export async function PATCH(request: NextRequest) {
         .delete()
         .eq("reminder_id", reminder_id)
 
+      const now = Date.now()
       const eventTime = new Date(reminder.event_date).getTime()
-      const newNotifications = remind_before_hours.map((hours: number) => ({
-        reminder_id,
-        user_id: userData.user.id,
-        scheduled_for: new Date(eventTime - hours * 60 * 60 * 1000).toISOString(),
-        notification_type: "reminder"
-      }))
+      const isCallback = reminder.reminder_type === "callback"
+      
+      const newNotifications = remind_before_hours.map((hours: number) => {
+        let scheduledFor: string
+        
+        if (hours < 0) {
+          // للاتصال: القيم السالبة = دقائق بعد القبول
+          const minutesAfter = Math.abs(hours)
+          scheduledFor = new Date(now + minutesAfter * 60 * 1000).toISOString()
+        } else {
+          // للمواعيد العادية: ساعات قبل الموعد
+          scheduledFor = new Date(eventTime - hours * 60 * 60 * 1000).toISOString()
+        }
+        
+        return {
+          reminder_id,
+          user_id: userData.user.id,
+          scheduled_for: scheduledFor,
+          notification_type: isCallback ? "callback_reminder" : "reminder"
+        }
+      })
 
       await adminClient.from("scheduled_notifications").insert(newNotifications)
     }

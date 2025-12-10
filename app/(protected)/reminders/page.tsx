@@ -40,12 +40,21 @@ interface Reminder {
   is_past: boolean
 }
 
-// خيارات التذكير
+// خيارات التذكير للمواعيد العادية (بالساعات)
 const REMIND_OPTIONS = [
   { value: 1, label: "قبل ساعة" },
   { value: 3, label: "قبل 3 ساعات" },
   { value: 24, label: "قبل يوم" },
   { value: 168, label: "قبل أسبوع" },
+]
+
+// خيارات التذكير للاتصال (بالدقائق - قيم سالبة للتمييز)
+const CALLBACK_REMIND_OPTIONS = [
+  { value: -5, label: "بعد 5 دقائق", minutes: 5 },
+  { value: -10, label: "بعد 10 دقائق", minutes: 10 },
+  { value: -15, label: "بعد ربع ساعة", minutes: 15 },
+  { value: -30, label: "بعد نصف ساعة", minutes: 30 },
+  { value: -60, label: "بعد ساعة", minutes: 60 },
 ]
 
 export default function RemindersPage() {
@@ -367,25 +376,54 @@ export default function RemindersPage() {
 
             {responseDialog.action === "accept" && (
               <div className="mb-4">
-                <p className="text-sm font-medium mb-2">🔔 ذكرني قبل:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {REMIND_OPTIONS.map(opt => (
-                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={responseDialog.selectedHours.includes(opt.value)}
-                        onCheckedChange={(checked) => {
-                          setResponseDialog(prev => ({
-                            ...prev,
-                            selectedHours: checked
-                              ? [...prev.selectedHours, opt.value]
-                              : prev.selectedHours.filter(h => h !== opt.value)
-                          }))
-                        }}
-                      />
-                      <span className="text-sm">{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
+                {responseDialog.reminder.reminder_type === "callback" ? (
+                  <>
+                    <p className="text-sm font-medium mb-2">⏰ ذكرني بعد:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {CALLBACK_REMIND_OPTIONS.map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={responseDialog.selectedHours.includes(opt.value)}
+                            onCheckedChange={(checked) => {
+                              setResponseDialog(prev => ({
+                                ...prev,
+                                selectedHours: checked
+                                  ? [...prev.selectedHours, opt.value]
+                                  : prev.selectedHours.filter(h => h !== opt.value)
+                              }))
+                            }}
+                          />
+                          <span className="text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      📞 سيتم تذكيرك برد الاتصال بعد الوقت المحدد
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium mb-2">🔔 ذكرني قبل:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {REMIND_OPTIONS.map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={responseDialog.selectedHours.includes(opt.value)}
+                            onCheckedChange={(checked) => {
+                              setResponseDialog(prev => ({
+                                ...prev,
+                                selectedHours: checked
+                                  ? [...prev.selectedHours, opt.value]
+                                  : prev.selectedHours.filter(h => h !== opt.value)
+                              }))
+                            }}
+                          />
+                          <span className="text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
