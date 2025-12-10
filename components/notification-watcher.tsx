@@ -64,45 +64,78 @@ export function NotificationWatcher() {
         }
     }
 
-    // عرض إشعار داخل التطبيق
-    const showInAppNotification = (title: string, body: string) => {
+    // عرض إشعار داخل التطبيق - أكثر جمالاً وتفاعلاً
+    const showInAppNotification = (title: string, body: string, type: "message" | "reminder" | "general" = "general") => {
+        // تحديد اللون والأيقونة حسب النوع
+        const typeStyles = {
+            message: {
+                gradient: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                icon: "💬"
+            },
+            reminder: {
+                gradient: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                icon: "📅"
+            },
+            general: {
+                gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                icon: "🔔"
+            }
+        }
+        
+        const style = typeStyles[type]
+        
         // إنشاء عنصر الإشعار
         const notifContainer = document.createElement('div')
         notifContainer.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: ${style.gradient};
             color: white;
             padding: 16px 20px;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3), 0 0 20px rgba(102, 126, 234, 0.3);
             z-index: 99999;
             max-width: 350px;
-            animation: slideIn 0.3s ease-out;
+            animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
             cursor: pointer;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             direction: rtl;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
         `
 
         notifContainer.innerHTML = `
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">${title}</div>
-            <div style="font-size: 13px; opacity: 0.9; line-height: 1.4;">${body}</div>
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="font-size: 28px; line-height: 1;">${style.icon}</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">${title}</div>
+                    <div style="font-size: 13px; opacity: 0.9; line-height: 1.5;">${body}</div>
+                </div>
+                <div style="font-size: 18px; opacity: 0.7; cursor: pointer; padding: 4px;" onclick="this.parentNode.parentNode.remove()">✕</div>
+            </div>
+            <div style="height: 3px; background: rgba(255,255,255,0.3); border-radius: 3px; margin-top: 12px; overflow: hidden;">
+                <div style="height: 100%; background: white; border-radius: 3px; animation: shrink 5s linear forwards;"></div>
+            </div>
         `
 
         // إضافة الـ CSS animation
-        const style = document.createElement('style')
-        style.textContent = `
+        const styleEl = document.createElement('style')
+        styleEl.textContent = `
             @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
+                from { transform: translateX(120%) scale(0.8); opacity: 0; }
+                to { transform: translateX(0) scale(1); opacity: 1; }
             }
             @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
+                from { transform: translateX(0) scale(1); opacity: 1; }
+                to { transform: translateX(120%) scale(0.8); opacity: 0; }
+            }
+            @keyframes shrink {
+                from { width: 100%; }
+                to { width: 0%; }
             }
         `
-        document.head.appendChild(style)
+        document.head.appendChild(styleEl)
 
         // إضافة للصفحة
         document.body.appendChild(notifContainer)
@@ -122,10 +155,18 @@ export function NotificationWatcher() {
         }, 5000)
     }
 
-    // عرض فقاعة الإشعار
+    // عرض فقاعة الإشعار مع تحديد النوع
     const showNotificationBubble = async (title: string, body: string) => {
-        // عرض إشعار داخل التطبيق فقط
-        showInAppNotification(title, body)
+        // تحديد نوع الإشعار من العنوان
+        let type: "message" | "reminder" | "general" = "general"
+        
+        if (title.includes("رسالة") || title.includes("محادثة") || title.includes("💬")) {
+            type = "message"
+        } else if (title.includes("تنبيه") || title.includes("دعوة") || title.includes("موعد") || title.includes("📅")) {
+            type = "reminder"
+        }
+        
+        showInAppNotification(title, body, type)
     }
 
     useEffect(() => {

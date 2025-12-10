@@ -119,8 +119,24 @@ export default function ChatPage() {
 
   const getPresenceStatus = (conv: Conversation) => {
     if (conv.other_user.is_online) {
-      return { color: "bg-green-500", text: "متصل" }
+      return { color: "bg-green-500 animate-pulse", text: "متصل الآن" }
     }
+    
+    // حساب آخر ظهور
+    if (conv.other_user.last_seen) {
+      const lastSeen = new Date(conv.other_user.last_seen)
+      const now = new Date()
+      const diff = now.getTime() - lastSeen.getTime()
+      const minutes = Math.floor(diff / (1000 * 60))
+      
+      if (minutes < 2) {
+        return { color: "bg-green-500 animate-pulse", text: "متصل الآن" }
+      }
+      if (minutes < 10) {
+        return { color: "bg-yellow-500", text: "متصل منذ قليل" }
+      }
+    }
+    
     return { color: "bg-gray-400", text: "" }
   }
 

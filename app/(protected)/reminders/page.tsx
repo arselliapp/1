@@ -64,7 +64,7 @@ export default function RemindersPage() {
     action: "accept" | "decline"
     selectedHours: number[]
     message: string
-  }>({ show: false, reminder: null, action: "accept", selectedHours: [1, 24], message: "" })
+  }>({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" }) // بدون تحديد مسبق
 
   const [counts, setCounts] = useState({ upcoming: 0, pending: 0, sent: 0 })
 
@@ -124,7 +124,7 @@ export default function RemindersPage() {
           type: "success"
         })
         loadReminders()
-        setResponseDialog({ show: false, reminder: null, action: "accept", selectedHours: [1, 24], message: "" })
+        setResponseDialog({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" })
       }
     } catch (err) {
       console.error("Error:", err)
@@ -181,10 +181,20 @@ export default function RemindersPage() {
     }
   }
 
+  // تنبيهات قادمة (مقبولة + لم تنتهي + واردة)
   const upcoming = reminders.filter(r => !r.is_past && r.status === "accepted" && !r.is_sent)
+  // تنبيهات معلقة (بانتظار الرد + واردة)
   const pending = reminders.filter(r => r.status === "pending" && !r.is_sent)
+  // تنبيهات مرسلة (جميعها)
   const sent = reminders.filter(r => r.is_sent)
-  const history = reminders.filter(r => r.status !== "pending" && !r.is_sent && !upcoming.includes(r))
+  // السجل: التنبيهات الواردة المنتهية أو المرفوضة
+  const history = reminders.filter(r => 
+    !r.is_sent && (
+      r.is_past || // منتهي
+      r.status === "declined" || // مرفوض
+      r.status === "expired" // منتهي الصلاحية
+    )
+  )
 
   if (loading) {
     return (
@@ -216,27 +226,33 @@ export default function RemindersPage() {
           <p className="mt-3 text-sm text-muted-foreground">{reminder.description}</p>
         )}
 
-        {/* Event Details */}
-        <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <CalendarIcon className="h-4 w-4 text-primary" />
-            <span>{formatDate(reminder.event_date)}</span>
-            <span className="text-muted-foreground">•</span>
-            <span>{formatTime(reminder.event_date)}</span>
-          </div>
-          {reminder.location && (
+        {/* Event Details - لا تظهر للاتصال */}
+        {reminder.reminder_type !== "callback" ? (
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-lg">📍</span>
-              <span>{reminder.location}</span>
+              <CalendarIcon className="h-4 w-4 text-primary" />
+              <span>{formatDate(reminder.event_date)}</span>
+              <span className="text-muted-foreground">•</span>
+              <span>{formatTime(reminder.event_date)}</span>
             </div>
-          )}
-          {!reminder.is_past && reminder.status === "accepted" && (
-            <div className="flex items-center gap-2 text-sm text-primary font-medium">
-              <BellIcon className="h-4 w-4" />
-              <span>{getTimeRemaining(reminder.event_date)}</span>
-            </div>
-          )}
-        </div>
+            {reminder.location && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-lg">📍</span>
+                <span>{reminder.location}</span>
+              </div>
+            )}
+            {!reminder.is_past && reminder.status === "accepted" && (
+              <div className="flex items-center gap-2 text-sm text-primary font-medium">
+                <BellIcon className="h-4 w-4" />
+                <span>{getTimeRemaining(reminder.event_date)}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+            <p className="text-sm text-blue-600">📞 تذكير برد على الاتصال</p>
+          </div>
+        )}
 
         {/* Response Message */}
         {reminder.response_message && (
@@ -256,7 +272,7 @@ export default function RemindersPage() {
                 show: true,
                 reminder,
                 action: "accept",
-                selectedHours: [1, 24],
+                selectedHours: [], // بدون تحديد مسبق
                 message: ""
               })}
             >
@@ -354,7 +370,7 @@ export default function RemindersPage() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setResponseDialog({ show: false, reminder: null, action: "accept", selectedHours: [1, 24], message: "" })}
+                onClick={() => setResponseDialog({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" })}
               >
                 إلغاء
               </Button>

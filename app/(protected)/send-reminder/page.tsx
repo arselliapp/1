@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
 import { SendIcon, ArrowRightIcon, SearchIcon } from "@/components/icons"
@@ -14,22 +13,13 @@ import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
 
-// أنواع التنبيهات
+// أنواع التنبيهات (بدون عيد ميلاد)
 const REMINDER_TYPES = [
-  { id: "wedding", label: "دعوة زواج", emoji: "💍", description: "دعوة لحضور حفل زواج" },
-  { id: "meeting", label: "اجتماع", emoji: "📅", description: "موعد اجتماع أو لقاء" },
-  { id: "callback", label: "رد على اتصال", emoji: "📞", description: "تذكير برد على مكالمة" },
-  { id: "birthday", label: "عيد ميلاد", emoji: "🎂", description: "دعوة لحضور عيد ميلاد" },
-  { id: "event", label: "مناسبة", emoji: "🎉", description: "دعوة لمناسبة عامة" },
-  { id: "general", label: "تذكير عام", emoji: "⏰", description: "تذكير بموعد أو مهمة" },
-]
-
-// خيارات التذكير
-const REMIND_OPTIONS = [
-  { value: 1, label: "قبل ساعة" },
-  { value: 3, label: "قبل 3 ساعات" },
-  { value: 24, label: "قبل يوم" },
-  { value: 168, label: "قبل أسبوع" },
+  { id: "wedding", label: "دعوة زواج", emoji: "💍", description: "دعوة لحضور حفل زواج", needsDetails: true },
+  { id: "meeting", label: "اجتماع", emoji: "📅", description: "موعد اجتماع أو لقاء", needsDetails: true },
+  { id: "callback", label: "رد على اتصال", emoji: "📞", description: "تذكير برد على مكالمة", needsDetails: false },
+  { id: "event", label: "مناسبة", emoji: "🎉", description: "دعوة لمناسبة عامة", needsDetails: true },
+  { id: "general", label: "تذكير عام", emoji: "⏰", description: "تذكير بموعد أو مهمة", needsDetails: true },
 ]
 
 interface Contact {
@@ -59,7 +49,6 @@ export default function SendReminderPage() {
   const [eventDate, setEventDate] = useState("")
   const [eventTime, setEventTime] = useState("")
   const [location, setLocation] = useState("")
-  const [remindHours, setRemindHours] = useState<number[]>([1, 24])
 
   useEffect(() => {
     if (user) loadContacts()
@@ -71,6 +60,13 @@ export default function SendReminderPage() {
       if (contact) setSelectedContact(contact)
     }
   }, [preselectedUserId, contacts])
+
+  // تحديث العنوان تلقائياً عند اختيار نوع callback
+  useEffect(() => {
+    if (selectedType === "callback" && !title) {
+      setTitle("تذكير برد على اتصال")
+    }
+  }, [selectedType])
 
   const loadContacts = async () => {
     try {
@@ -84,7 +80,6 @@ export default function SendReminderPage() {
         return
       }
 
-      // جلب معلومات جهات الاتصال
       const contactIds = data?.map(c => c.contact_user_id) || []
       const contactsList: Contact[] = []
 
@@ -113,8 +108,16 @@ export default function SendReminderPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!selectedContact || !selectedType || !title || !eventDate || !eventTime) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى ملء جميع الحقول المطلوبة", type: "error" })
+    const typeInfo = REMINDER_TYPES.find(t => t.id === selectedType)
+    const needsDetails = typeInfo?.needsDetails !== false
+
+    if (!selectedContact || !selectedType || !title) {
+      showToast({ title: "⚠️ تنبيه", message: "يرجى ملء الحقول المطلوبة", type: "error" })
+      return
+    }
+
+    if (needsDetails && (!eventDate || !eventTime)) {
+      showToast({ title: "⚠️ تنبيه", message: "يرجى تحديد التاريخ والوقت", type: "error" })
       return
     }
 
@@ -127,8 +130,13 @@ export default function SendReminderPage() {
         return
       }
 
-      // دمج التاريخ والوقت
-      const eventDateTime = new Date(`${eventDate}T${eventTime}`)
+      // للاتصال: استخدم الوقت الحالي + ساعة كوقت افتراضي
+      let eventDateTime: Date
+      if (needsDetails) {
+        eventDateTime = new Date(`${eventDate}T${eventTime}`)
+      } else {
+        eventDateTime = new Date(Date.now() + 60 * 60 * 1000) // بعد ساعة
+      }
 
       const response = await fetch("/api/reminders", {
         method: "POST",
@@ -140,10 +148,10 @@ export default function SendReminderPage() {
           recipient_id: selectedContact.id,
           reminder_type: selectedType,
           title,
-          description,
+          description: needsDetails ? description : undefined,
           event_date: eventDateTime.toISOString(),
-          location,
-          remind_before_hours: remindHours
+          location: needsDetails ? location : undefined,
+          remind_before_hours: [] // لا تحديد مسبق
         })
       })
 
@@ -175,8 +183,9 @@ export default function SendReminderPage() {
     c.phone?.includes(searchQuery)
   )
 
-  // الحد الأدنى للتاريخ (اليوم)
   const minDate = new Date().toISOString().split("T")[0]
+  const selectedTypeInfo = REMINDER_TYPES.find(t => t.id === selectedType)
+  const needsDetails = selectedTypeInfo?.needsDetails !== false
 
   if (loading) {
     return (
@@ -275,7 +284,15 @@ export default function SendReminderPage() {
                       ? "border-primary bg-primary/10"
                       : "border-transparent bg-muted hover:border-muted-foreground/30"
                   }`}
-                  onClick={() => setSelectedType(type.id)}
+                  onClick={() => {
+                    setSelectedType(type.id)
+                    // تعيين عنوان افتراضي للاتصال
+                    if (type.id === "callback") {
+                      setTitle("تذكير برد على اتصال")
+                    } else if (title === "تذكير برد على اتصال") {
+                      setTitle("")
+                    }
+                  }}
                 >
                   <span className="text-3xl">{type.emoji}</span>
                   <p className="font-medium mt-2 text-sm">{type.label}</p>
@@ -285,7 +302,7 @@ export default function SendReminderPage() {
           </CardContent>
         </Card>
 
-        {/* Step 3: Details */}
+        {/* Step 3: Details (only if needed) */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">📝 التفاصيل</CardTitle>
@@ -295,83 +312,71 @@ export default function SendReminderPage() {
               <Label htmlFor="title">العنوان *</Label>
               <Input
                 id="title"
-                placeholder="مثال: زواج أحمد"
+                placeholder={selectedType === "callback" ? "تذكير برد على اتصال" : "مثال: زواج أحمد"}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
             </div>
 
-            <div>
-              <Label htmlFor="description">الوصف (اختياري)</Label>
-              <Textarea
-                id="description"
-                placeholder="تفاصيل إضافية..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="date">التاريخ *</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  min={minDate}
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="time">الوقت *</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={eventTime}
-                  onChange={(e) => setEventTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="location">المكان (اختياري)</Label>
-              <Input
-                id="location"
-                placeholder="مثال: قاعة النخيل - الرياض"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Step 4: Reminder Options */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">🔔 تذكير المستلم قبل</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {REMIND_OPTIONS.map(opt => (
-                <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={remindHours.includes(opt.value)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setRemindHours([...remindHours, opt.value])
-                      } else {
-                        setRemindHours(remindHours.filter(h => h !== opt.value))
-                      }
-                    }}
+            {/* تظهر فقط للأنواع التي تحتاج تفاصيل */}
+            {needsDetails && (
+              <>
+                <div>
+                  <Label htmlFor="description">الوصف (اختياري)</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="تفاصيل إضافية..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
                   />
-                  <span>{opt.label}</span>
-                </label>
-              ))}
-            </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="date">التاريخ *</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      min={minDate}
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      required={needsDetails}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="time">الوقت *</Label>
+                    <Input
+                      id="time"
+                      type="time"
+                      value={eventTime}
+                      onChange={(e) => setEventTime(e.target.value)}
+                      required={needsDetails}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="location">المكان (اختياري)</Label>
+                  <Input
+                    id="location"
+                    placeholder="مثال: قاعة النخيل - الرياض"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* رسالة للاتصال */}
+            {selectedType === "callback" && (
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <p className="text-sm text-blue-600">
+                  📞 سيتم إرسال تذكير فوري للمستلم برد على اتصالك
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -379,7 +384,7 @@ export default function SendReminderPage() {
         <Button
           type="submit"
           className="w-full h-12 text-lg"
-          disabled={!selectedContact || !selectedType || !title || !eventDate || !eventTime || sending}
+          disabled={!selectedContact || !selectedType || !title || (needsDetails && (!eventDate || !eventTime)) || sending}
         >
           {sending ? (
             <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -394,4 +399,3 @@ export default function SendReminderPage() {
     </div>
   )
 }
-

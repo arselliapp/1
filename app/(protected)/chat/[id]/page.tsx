@@ -280,20 +280,36 @@ export default function ChatRoomPage() {
 
   const getPresenceText = () => {
     if (!otherUser) return ""
-    if (otherUser.is_online) return "متصل الآن"
+    
+    // متصل الآن
+    if (otherUser.is_online) {
+      return "متصل الآن 🟢"
+    }
+    
+    // آخر ظهور
     if (otherUser.last_seen) {
       const lastSeen = new Date(otherUser.last_seen)
       const now = new Date()
       const diff = now.getTime() - lastSeen.getTime()
       const minutes = Math.floor(diff / (1000 * 60))
       const hours = Math.floor(diff / (1000 * 60 * 60))
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
-      if (minutes < 5) return "متصل الآن"
-      if (minutes < 60) return `آخر ظهور منذ ${minutes} دقيقة`
-      if (hours < 24) return `آخر ظهور منذ ${hours} ساعة`
+      // حالات أكثر واقعية
+      if (minutes < 2) return "متصل الآن 🟢"
+      if (minutes < 5) return "متصل منذ قليل 🟡"
+      if (minutes < 15) return `آخر ظهور منذ ${minutes} دقيقة`
+      if (minutes < 30) return "آخر ظهور منذ ربع ساعة"
+      if (minutes < 60) return "آخر ظهور منذ نصف ساعة"
+      if (hours === 1) return "آخر ظهور منذ ساعة"
+      if (hours < 6) return `آخر ظهور منذ ${hours} ساعات`
+      if (hours < 12) return "آخر ظهور اليوم صباحاً"
+      if (hours < 24) return "آخر ظهور اليوم"
+      if (days === 1) return "آخر ظهور أمس"
+      if (days < 7) return `آخر ظهور منذ ${days} أيام`
       return `آخر ظهور ${formatDate(otherUser.last_seen)}`
     }
-    return ""
+    return "غير متصل"
   }
 
   // تجميع الرسائل حسب التاريخ
@@ -389,7 +405,7 @@ export default function ChatRoomPage() {
                         {formatTime(msg.created_at)}
                       </span>
                       {isMe && (
-                        <span className={`text-[10px] ${msg.is_read ? "text-blue-300" : "text-primary-foreground/50"}`}>
+                        <span className={`text-xs font-bold ${msg.is_read ? "text-cyan-300 drop-shadow-[0_0_3px_rgba(0,200,255,0.8)]" : "text-primary-foreground/60"}`}>
                           {msg.is_read ? "✓✓" : "✓"}
                         </span>
                       )}
