@@ -1,42 +1,31 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createRouteHandlerClient, createAdminClient } from "@/lib/supabase-server"
+import { createAdminClient } from "@/lib/supabase-server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function POST(request: NextRequest) {
     try {
-        const supabase = createRouteHandlerClient()
-
-        // محاولة الحصول على الـ session
-        let session = null
-
-        try {
-            const { data: sessionData } = await supabase.auth.getSession()
-            session = sessionData?.session
-        } catch (err) {
-            // Silent error handling
-        }
-
-        // إذا لم نجد session من cookies، حاول من Authorization header
-        if (!session) {
-            const authHeader = request.headers.get("authorization")
-            if (authHeader && authHeader.startsWith("Bearer ")) {
-                const token = authHeader.substring(7)
-
-                try {
-                    const { data, error } = await supabase.auth.getUser(token)
-                    if (error || !data.user) {
-                        return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 })
-                    }
-                    session = { user: data.user } as any
-                } catch (err) {
-                    // Silent error handling
-                }
-            }
-        }
-
-        if (!session) {
+        // الحصول على الـ token من Authorization header
+        const authHeader = request.headers.get("authorization")
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
+
+        const token = authHeader.substring(7)
+        
+        // إنشاء Supabase client للتحقق من الـ token
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        const { data: userData, error: userError } = await supabase.auth.getUser(token)
+        
+        if (userError || !userData.user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const session = { user: userData.user }
 
         const { request_id, reply } = await request.json()
 
@@ -100,11 +89,13 @@ export async function POST(request: NextRequest) {
             .insert(replyRequestData)
 
         // إرسال إشعار للمرسل الأصلي
+        const replyExcerpt = reply.length > 50 ? reply.substring(0, 50) + "..." : reply
+        
         const notificationData = {
             user_id: originalRequest.sender_id,
-            title: `💬 رد جديد من ${responderName}`,
-            body: `تم الرد على طلبك - افتح صفحة الطلبات الواردة لعرض الرد`,
-            type: "request",
+            title: `✉️ ${responderName} رد على طلبك`,
+            body: `"${replyExcerpt}"`,
+            type: "reply",
             url: "/requests?tab=received",
             data: {
                 requestId: request_id,

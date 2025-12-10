@@ -115,10 +115,23 @@ export async function POST(request: NextRequest) {
         session.user.email?.split('@')[0] ||
         "مستخدم"
 
+      // رسائل احترافية حسب نوع الطلب
+      const typeMessages: Record<string, { title: string; emoji: string }> = {
+        whatsapp: { title: "يريد التواصل معك عبر واتساب", emoji: "💬" },
+        x: { title: "يريد متابعتك على X", emoji: "🐦" },
+        snapchat: { title: "يريد إضافتك على سناب شات", emoji: "👻" },
+        marriage: { title: "أرسل لك دعوة زواج", emoji: "💍" },
+        meeting: { title: "يريد ترتيب اجتماع معك", emoji: "📅" },
+        callback: { title: "يطلب منك الرد على اتصاله", emoji: "📞" },
+        reminder: { title: "أرسل لك تذكيراً بموعد", emoji: "⏰" },
+      }
+
+      const typeInfo = typeMessages[type] || { title: "أرسل لك طلباً جديداً", emoji: "📩" }
+
       const notificationData = {
         user_id: recipient_id,
-        title: `طلب جديد من ${senderName}`,
-        body: message.substring(0, 100),
+        title: `${typeInfo.emoji} ${senderName} ${typeInfo.title}`,
+        body: message.length > 80 ? message.substring(0, 80) + "..." : message,
         type: "request",
         url: "/requests",
         data: {
