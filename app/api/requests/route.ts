@@ -7,13 +7,13 @@ import { checkRateLimit, detectSpamPatterns } from "@/lib/anti-spam"
 export async function POST(request: NextRequest) {
   try {
     // الحصول على الـ token من Authorization header
-    const authHeader = request.headers.get("authorization")
+      const authHeader = request.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized: No token provided" }, { status: 401 })
     }
 
-    const token = authHeader.substring(7)
-    
+        const token = authHeader.substring(7)
+
     // إنشاء Supabase client والتحقق من الـ token
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
     const { data: userData, error: userError } = await supabase.auth.getUser(token)
     
     if (userError || !userData.user) {
-      return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 })
-    }
+            return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 })
+          }
 
     const session = { user: userData.user }
 

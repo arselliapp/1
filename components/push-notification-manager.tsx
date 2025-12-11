@@ -142,17 +142,62 @@ export function PushNotificationManager() {
       if (!session || !session.access_token) {
         console.error('❌ No valid session found after', maxAttempts, 'attempts')
         // محاولة استخدام localStorage كـ fallback
+        // Supabase يحفظ الجلسة في localStorage بمفتاح 'arselli-auth-token'
         const tokenKey = 'arselli-auth-token'
         const tokenData = localStorage.getItem(tokenKey)
+        
         if (tokenData) {
           try {
-            const tokenObj = JSON.parse(tokenData)
-            if (tokenObj.access_token) {
+            // Supabase يحفظ الجلسة كـ JSON string
+            const sessionData = JSON.parse(tokenData)
+            
+            // قد يكون التوكن في sessionData.access_token أو sessionData.currentSession.access_token
+            let accessToken = null
+            
+            if (sessionData.access_token) {
+              accessToken = sessionData.access_token
+            } else if (sessionData.currentSession?.access_token) {
+              accessToken = sessionData.currentSession.access_token
+            } else if (sessionData.session?.access_token) {
+              accessToken = sessionData.session.access_token
+            }
+            
+            if (accessToken) {
               console.log('🔄 Using token from localStorage as fallback')
-              session = { access_token: tokenObj.access_token }
+              session = { access_token: accessToken }
+            } else {
+              console.warn('⚠️ Token data found but no access_token:', Object.keys(sessionData))
             }
           } catch (e) {
             console.error('❌ Error parsing token from localStorage:', e)
+            // محاولة قراءة مباشرة كـ string (إذا كان التوكن محفوظاً كـ string)
+            if (tokenData && tokenData.length > 50 && !tokenData.startsWith('{')) {
+              console.log('🔄 Trying token as direct string')
+              session = { access_token: tokenData }
+            }
+          }
+        } else {
+          console.warn('⚠️ No token data found in localStorage with key:', tokenKey)
+          // محاولة البحث عن أي مفتاح يحتوي على 'auth' أو 'token'
+          const allKeys = Object.keys(localStorage)
+          const authKeys = allKeys.filter(k => k.includes('auth') || k.includes('token'))
+          console.log('🔍 Found auth-related keys:', authKeys)
+          
+          for (const key of authKeys) {
+            try {
+              const data = localStorage.getItem(key)
+              if (data) {
+                const parsed = JSON.parse(data)
+                if (parsed.access_token || parsed.currentSession?.access_token) {
+                  const token = parsed.access_token || parsed.currentSession?.access_token
+                  console.log(`🔄 Found token in key: ${key}`)
+                  session = { access_token: token }
+                  break
+                }
+              }
+            } catch (e) {
+              // تجاهل الأخطاء
+            }
           }
         }
       }

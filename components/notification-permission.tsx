@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BellIcon } from "@/components/icons"
@@ -17,8 +18,8 @@ export function NotificationPermission() {
     }
 
     const checkPermission = () => {
-      const currentPermission = Notification.permission
-      setPermission(currentPermission)
+    const currentPermission = Notification.permission
+    setPermission(currentPermission)
 
       // عرض الطلب إذا لم يتم السماح (إجباري)
       if (currentPermission !== "granted") {
@@ -79,12 +80,12 @@ export function NotificationPermission() {
         return
       }
 
-      // تسجيل Service Worker إذا لم يكن مسجل
+      // تسجيل Service Worker الخاص بالإشعارات (push-sw) وليس sw.js
       let registration = await navigator.serviceWorker.getRegistration()
-      if (!registration) {
-        console.log("📝 Registering Service Worker...")
-        registration = await navigator.serviceWorker.register('/sw.js')
-        console.log("✅ Service Worker registered")
+      if (!registration || !registration.active?.scriptURL.includes("push-sw.js")) {
+        console.log("📝 Registering Push Service Worker...")
+        registration = await navigator.serviceWorker.register("/push-sw.js", { scope: "/" })
+        console.log("✅ Push Service Worker registered")
       }
 
       // انتظار Service Worker حتى يكون جاهزاً
@@ -98,28 +99,37 @@ export function NotificationPermission() {
         return
       }
 
-      // الاشتراك في Push Notifications
-      console.log("📱 Subscribing to push notifications...")
-      const subscription = await registration.pushManager.subscribe({
+      // جلب جلسة المستخدم للحصول على access_token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        console.error("❌ No access token available to save subscription")
+        return
+      }
+
+      // الاشتراك في Push Notifications (تأكد من عدم وجود اشتراك سابق)
+      const existing = await registration.pushManager.getSubscription()
+      const subscription = existing || await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
 
-      console.log("✅ Push subscription created:", subscription)
+      console.log("✅ Push subscription ready:", subscription.endpoint)
 
-      // حفظ الاشتراك في قاعدة البيانات
+      // حفظ الاشتراك في قاعدة البيانات باستخدام التوكن (متوافق مع RLS)
       const response = await fetch("/api/notifications/subscribe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(subscription),
+        body: JSON.stringify(subscription.toJSON()),
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        console.error("❌ Error saving subscription:", error)
-        alert("فشل في حفظ الاشتراك: " + (error.error || "خطأ غير معروف"))
+        const errorText = await response.text()
+        console.error("❌ Error saving subscription:", errorText)
+        // لا نعرض alert تلقائياً - فقط في console لتجنب إزعاج المستخدم
+        // سيتم إعادة المحاولة تلقائياً من PushNotificationManager
         return
       }
 

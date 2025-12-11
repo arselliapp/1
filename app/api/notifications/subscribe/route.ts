@@ -77,7 +77,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error in subscribe route:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Internal server error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

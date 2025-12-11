@@ -55,10 +55,11 @@ export function createRouteHandlerClient() {
  */
 export function createAdminClient() {
   if (!SUPABASE_SERVICE_KEY) {
-    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is not set")
+    // استخدام anon key هنا سيؤدي إلى فشل RLS بصمت، لذا نوقف التنفيذ برسالة واضحة
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set. Admin client requires the service role key.")
   }
-  
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY, {
+
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
