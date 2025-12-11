@@ -206,26 +206,31 @@ export default function RemindersPage() {
     }
   }
 
-  // ترتيب حسب التاريخ (الأقرب أولاً للقادمة، الأحدث أولاً للباقي)
-  const sortByDateAsc = (a: Reminder, b: Reminder) => 
+  // ترتيب حسب التاريخ
+  const sortByEventDateAsc = (a: Reminder, b: Reminder) => 
     new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
-  const sortByDateDesc = (a: Reminder, b: Reminder) => 
-    new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
+  const sortByCreatedDesc = (a: Reminder, b: Reminder) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  const sortByRespondedDesc = (a: Reminder, b: Reminder) => {
+    const dateA = a.responded_at ? new Date(a.responded_at).getTime() : new Date(a.created_at).getTime()
+    const dateB = b.responded_at ? new Date(b.responded_at).getTime() : new Date(b.created_at).getTime()
+    return dateB - dateA
+  }
 
   // تنبيهات قادمة (مقبولة + لم تنتهي + واردة) - مرتبة بالأقرب أولاً
   const upcoming = reminders
     .filter(r => !r.is_past && r.status === "accepted" && !r.is_sent)
-    .sort(sortByDateAsc)
+    .sort(sortByEventDateAsc)
   
-  // تنبيهات معلقة (بانتظار الرد + واردة) - مرتبة بالأقرب أولاً
+  // تنبيهات معلقة (بانتظار الرد + واردة) - مرتبة بالأحدث أولاً (آخر تحديث)
   const pending = reminders
     .filter(r => r.status === "pending" && !r.is_sent)
-    .sort(sortByDateAsc)
+    .sort(sortByCreatedDesc)
   
   // تنبيهات مرسلة (جميعها) - مرتبة بالأحدث أولاً
   const sent = reminders
     .filter(r => r.is_sent)
-    .sort(sortByDateDesc)
+    .sort(sortByCreatedDesc)
   
   // السجل: التنبيهات الواردة المنتهية أو المرفوضة (بدون المرسلة) - مرتبة بالأحدث أولاً
   const history = reminders
@@ -236,7 +241,7 @@ export default function RemindersPage() {
         r.status === "expired"
       )
     )
-    .sort(sortByDateDesc)
+    .sort(sortByRespondedDesc)
 
   // تغيير التبويب
   const handleTabChange = (tab: string) => {
@@ -253,13 +258,13 @@ export default function RemindersPage() {
   }
 
   const ReminderCard = ({ reminder, showActions = false }: { reminder: Reminder; showActions?: boolean }) => (
-    <Card className={`${reminder.is_past ? "opacity-60" : ""} ${reminder.status === "pending" && !reminder.is_sent ? "border-amber-500/50 bg-amber-500/5" : ""}`}>
+    <Card className={`text-right ${reminder.is_past ? "opacity-60" : ""} ${reminder.status === "pending" && !reminder.is_sent ? "border-amber-500/50 bg-amber-500/5" : ""}`}>
       <CardContent className="p-5">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between gap-4 flex-row-reverse">
+          <div className="flex items-center gap-3 flex-row-reverse">
             <div className="text-4xl">{reminder.type_info.emoji}</div>
-            <div>
+            <div className="text-right">
               <h3 className="font-semibold text-lg">{reminder.title}</h3>
               <p className="text-sm text-muted-foreground">
                 {reminder.is_sent ? `إلى: ${reminder.recipient?.name}` : `من: ${reminder.sender?.name}`}
@@ -281,28 +286,28 @@ export default function RemindersPage() {
 
         {/* Event Details - لا تظهر للاتصال */}
         {reminder.reminder_type !== "callback" ? (
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2 text-right">
+            <div className="flex items-center gap-2 text-sm flex-row-reverse">
               <CalendarIcon className="h-4 w-4 text-primary" />
               <span>{formatDate(reminder.event_date)}</span>
               <span className="text-muted-foreground">•</span>
               <span>{formatTime(reminder.event_date)}</span>
             </div>
             {reminder.location && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm flex-row-reverse">
                 <span className="text-lg">📍</span>
                 <span>{reminder.location}</span>
               </div>
             )}
             {!reminder.is_past && reminder.status === "accepted" && (
-              <div className="flex items-center gap-2 text-sm text-primary font-medium">
+              <div className="flex items-center gap-2 text-sm text-primary font-medium flex-row-reverse">
                 <BellIcon className="h-4 w-4" />
                 <span>{getTimeRemaining(reminder.event_date)}</span>
               </div>
             )}
           </div>
         ) : (
-          <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+          <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30 text-right">
             <p className="text-sm text-blue-600">📞 تذكير برد على الاتصال</p>
           </div>
         )}

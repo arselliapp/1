@@ -100,15 +100,24 @@ export default function TasksPage() {
     }
   }
 
-  // فلترة المهام
-  const filteredTasks = tasks.filter(t => {
-    const statusMatch = activeTab === "all" || t.status === activeTab
-    const typeMatch = typeFilter === "all" || t.task_type === typeFilter
-    return statusMatch && typeMatch
-  })
+  // ترتيب المهام حسب آخر تحديث
+  const sortByDate = (a: Task, b: Task) => {
+    const dateA = new Date(a.created_at).getTime()
+    const dateB = new Date(b.created_at).getTime()
+    return dateB - dateA // الأحدث أولاً
+  }
 
-  const activeTasks = tasks.filter(t => t.status === "active")
-  const completedTasks = tasks.filter(t => t.status === "completed")
+  // فلترة المهام
+  const filteredTasks = tasks
+    .filter(t => {
+      const statusMatch = activeTab === "all" || t.status === activeTab
+      const typeMatch = typeFilter === "all" || t.task_type === typeFilter
+      return statusMatch && typeMatch
+    })
+    .sort(sortByDate)
+
+  const activeTasks = tasks.filter(t => t.status === "active").sort(sortByDate)
+  const completedTasks = tasks.filter(t => t.status === "completed").sort(sortByDate)
 
   if (loading) {
     return (
@@ -210,28 +219,28 @@ export default function TasksPage() {
           ) : (
             filteredTasks.map(task => (
               <Link key={task.id} href={`/tasks/${task.id}`}>
-                <Card className={`cursor-pointer hover:shadow-md transition-all ${
+                <Card className={`cursor-pointer hover:shadow-md transition-all text-right ${
                   task.status === "completed" ? "opacity-70" : ""
                 }`}>
                   <CardContent className="p-5">
                     {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-start justify-between gap-3 mb-3 flex-row-reverse">
+                      <div className="flex items-center gap-3 flex-row-reverse">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
                           task.task_type === "daily" ? "bg-blue-500/20" :
                           task.task_type === "weekly" ? "bg-green-500/20" : "bg-purple-500/20"
                         }`}>
                           {task.type_info.emoji}
                         </div>
-                        <div>
+                        <div className="text-right">
                           <h3 className="font-semibold text-lg">{task.title}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap flex-row-reverse">
                             <Badge variant="outline" className={`${getTypeColor(task.task_type)} text-white border-0 text-xs`}>
                               {task.type_info.label}
                             </Badge>
                             {task.is_group_task && (
                               <>
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-1 flex-row-reverse">
                                   <UsersIcon className="h-3 w-3" />
                                   {task.members.length}
                                 </span>
@@ -250,19 +259,19 @@ export default function TasksPage() {
 
                     {/* Progress */}
                     <div className="mb-3">
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-sm mb-1 flex-row-reverse">
                         <span className="text-muted-foreground">التقدم</span>
                         <span className="font-medium">{task.progress}%</span>
                       </div>
-                      <Progress value={task.progress} className="h-2" />
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <Progress value={task.progress} className="h-2" style={{ direction: "ltr" }} />
+                      <p className="text-xs text-muted-foreground mt-1 text-right">
                         {task.completed_items} من {task.total_items} مهام
                       </p>
                     </div>
 
                     {/* Members */}
                     {task.is_group_task && task.members.length > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-row-reverse">
                         <span className="text-xs text-muted-foreground">المشاركون:</span>
                         <div className="flex -space-x-2 space-x-reverse">
                           {task.members.slice(0, 5).map((member, i) => (

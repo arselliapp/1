@@ -128,34 +128,45 @@ export async function POST(
       const otherMembers = members?.filter(m => m.user_id !== userData.user.id) || []
       
       if (completed && otherMembers.length > 0) {
+        // حفظ الإشعارات في قاعدة البيانات
         const notifications = otherMembers.map(m => ({
           user_id: m.user_id,
-          title: `✅ تم إنجاز طلب`,
+          title: `✅ تم إنجاز مهمة`,
           body: `${completerName} أنجز: ${item.title}`,
           type: "task_update",
           url: `/tasks/${taskId}`,
-          data: { taskId, itemId: item_id, realtime: true },
+          data: JSON.stringify({ taskId, itemId: item_id, realtime: true }),
           is_read: false
         }))
 
-        await adminClient.from("notifications").insert(notifications)
+        const { error: notifError } = await adminClient.from("notifications").insert(notifications)
+        if (notifError) {
+          console.error("Error inserting notifications:", notifError)
+        }
 
-        // إرسال إشعار push فوري
-        for (const m of otherMembers) {
+        // إرسال إشعار push فوري لكل عضو
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ""
+        
+        await Promise.all(otherMembers.map(async (m) => {
           try {
-            await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ""}/api/notifications/send`, {
+            const response = await fetch(`${siteUrl}/api/notifications/send`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 userId: m.user_id,
-                title: `✅ تم إنجاز طلب`,
+                title: `✅ تم إنجاز مهمة`,
                 body: `${completerName} أنجز: ${item.title}`,
                 url: `/tasks/${taskId}`,
                 data: { taskId, itemId: item_id }
               })
             })
-          } catch (e) { /* تجاهل أخطاء الإشعارات */ }
-        }
+            if (!response.ok) {
+              console.log("Push notification failed for user:", m.user_id)
+            }
+          } catch (e) {
+            console.log("Push notification error:", e)
+          }
+        }))
       }
     } else {
       // للمهام الفردية: تحديث مباشر
