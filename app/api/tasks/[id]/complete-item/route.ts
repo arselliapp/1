@@ -79,7 +79,7 @@ export async function POST(
           .eq("user_id", userData.user.id)
       }
 
-      // التحقق من اكتمال العنصر من الجميع
+      // التحقق من اكتمال العنصر
       const { data: members } = await supabase
         .from("task_assignments")
         .select("user_id")
@@ -90,10 +90,20 @@ export async function POST(
         .select("user_id")
         .eq("task_item_id", item_id)
 
-      const allCompleted = members?.length === completions?.length
+      // تحديد اكتمال العنصر بناءً على نوع الإنجاز
+      const completionType = task.completion_type || "all"
+      let itemCompleted = false
+      
+      if (completionType === "any") {
+        // أي شخص: يكفي شخص واحد
+        itemCompleted = (completions?.length || 0) >= 1
+      } else {
+        // الجميع: يجب أن يكمله كل المشاركين
+        itemCompleted = members?.length === completions?.length
+      }
 
-      // تحديث حالة العنصر إذا أكمله الجميع
-      if (allCompleted) {
+      // تحديث حالة العنصر
+      if (itemCompleted) {
         await adminClient
           .from("task_items")
           .update({
@@ -175,6 +185,7 @@ export async function POST(
     if (task.is_group_task) {
       // للمهام الجماعية
       const totalMembers = allMembers?.length || 0
+      const completionType = task.completion_type || "all"
       let allItemsCompleted = true
 
       for (const i of allItems || []) {
@@ -183,9 +194,18 @@ export async function POST(
           .select("*", { count: "exact", head: true })
           .eq("task_item_id", i.id)
 
-        if ((count || 0) < totalMembers) {
-          allItemsCompleted = false
-          break
+        if (completionType === "any") {
+          // أي شخص: يكفي شخص واحد لكل عنصر
+          if ((count || 0) < 1) {
+            allItemsCompleted = false
+            break
+          }
+        } else {
+          // الجميع: يجب أن يكمله كل المشاركين
+          if ((count || 0) < totalMembers) {
+            allItemsCompleted = false
+            break
+          }
         }
       }
 

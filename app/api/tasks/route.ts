@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
           description,
           task_type,
           is_group_task,
+          completion_type,
           status,
           due_date,
           completed_at,
@@ -134,13 +135,23 @@ export async function GET(request: NextRequest) {
         // حساب التقدم
         const totalItems = itemsWithCompletion.length
         let completedItems = 0
+        const completionType = task.completion_type || "all"
         
         if (task.is_group_task) {
-          // للمهام الجماعية: نحسب العناصر التي أكملها الجميع
+          // للمهام الجماعية
           const totalMembers = membersWithInfo.length
-          completedItems = itemsWithCompletion.filter(
-            item => item.completions.length >= totalMembers
-          ).length
+          
+          if (completionType === "any") {
+            // أي شخص: يكفي شخص واحد لكل عنصر
+            completedItems = itemsWithCompletion.filter(
+              item => item.completions.length >= 1
+            ).length
+          } else {
+            // الجميع: نحسب العناصر التي أكملها الجميع
+            completedItems = itemsWithCompletion.filter(
+              item => item.completions.length >= totalMembers
+            ).length
+          }
         } else {
           completedItems = itemsWithCompletion.filter(item => item.is_completed).length
         }
@@ -201,6 +212,7 @@ export async function POST(request: NextRequest) {
       description, 
       task_type, 
       is_group_task,
+      completion_type = "all", // "all" = الجميع، "any" = أي شخص
       member_ids = [],
       items = [],
       due_date
@@ -225,6 +237,7 @@ export async function POST(request: NextRequest) {
         description,
         task_type,
         is_group_task: is_group_task && member_ids.length > 0,
+        completion_type: is_group_task ? completion_type : "all",
         due_date,
         status: "active"
       })

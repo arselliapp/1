@@ -31,6 +31,7 @@ interface Task {
   description?: string
   task_type: "daily" | "weekly" | "monthly"
   is_group_task: boolean
+  completion_type?: "all" | "any"
   status: "active" | "completed"
   due_date?: string
   created_at: string
@@ -224,15 +225,20 @@ export default function TasksPage() {
                         </div>
                         <div>
                           <h3 className="font-semibold text-lg">{task.title}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                             <Badge variant="outline" className={`${getTypeColor(task.task_type)} text-white border-0 text-xs`}>
                               {task.type_info.label}
                             </Badge>
                             {task.is_group_task && (
-                              <span className="flex items-center gap-1">
-                                <UsersIcon className="h-3 w-3" />
-                                {task.members.length}
-                              </span>
+                              <>
+                                <span className="flex items-center gap-1">
+                                  <UsersIcon className="h-3 w-3" />
+                                  {task.members.length}
+                                </span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {task.completion_type === "any" ? "👤 أي شخص" : "👥 الجميع"}
+                                </Badge>
+                              </>
                             )}
                           </div>
                         </div>
@@ -250,7 +256,7 @@ export default function TasksPage() {
                       </div>
                       <Progress value={task.progress} className="h-2" />
                       <p className="text-xs text-muted-foreground mt-1">
-                        {task.completed_items} من {task.total_items} طلبات
+                        {task.completed_items} من {task.total_items} مهام
                       </p>
                     </div>
 

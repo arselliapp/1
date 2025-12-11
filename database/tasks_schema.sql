@@ -10,12 +10,21 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT,
     task_type VARCHAR(20) NOT NULL CHECK (task_type IN ('daily', 'weekly', 'monthly')),
     is_group_task BOOLEAN DEFAULT FALSE,
+    completion_type VARCHAR(10) DEFAULT 'all' CHECK (completion_type IN ('all', 'any')), -- all = الجميع، any = أي شخص
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
     due_date TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- إضافة العمود للجدول الموجود (للتحديث)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='completion_type') THEN
+        ALTER TABLE tasks ADD COLUMN completion_type VARCHAR(10) DEFAULT 'all' CHECK (completion_type IN ('all', 'any'));
+    END IF;
+END $$;
 
 -- جدول تعيينات المهام (المشاركين في المهمة)
 CREATE TABLE IF NOT EXISTS task_assignments (

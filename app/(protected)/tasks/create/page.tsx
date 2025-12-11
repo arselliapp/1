@@ -48,6 +48,7 @@ export default function CreateTaskPage() {
   const [description, setDescription] = useState("")
   const [taskType, setTaskType] = useState<string>("daily")
   const [isGroupTask, setIsGroupTask] = useState(false)
+  const [completionType, setCompletionType] = useState<"all" | "any">("all") // الجميع أو أي شخص
   const [selectedMembers, setSelectedMembers] = useState<Contact[]>([])
   const [items, setItems] = useState<TaskItem[]>([{ id: "1", title: "" }])
   const [dueDate, setDueDate] = useState("")
@@ -121,7 +122,7 @@ export default function CreateTaskPage() {
 
     const validItems = items.filter(item => item.title.trim())
     if (validItems.length === 0) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى إضافة طلب واحد على الأقل", type: "error" })
+      showToast({ title: "⚠️ تنبيه", message: "يرجى إضافة مهمة واحدة على الأقل", type: "error" })
       return
     }
 
@@ -145,6 +146,7 @@ export default function CreateTaskPage() {
           description: description.trim(),
           task_type: taskType,
           is_group_task: isGroupTask && selectedMembers.length > 0,
+          completion_type: completionType,
           member_ids: selectedMembers.map(m => m.id),
           items: validItems.map(item => ({ title: item.title.trim() })),
           due_date: dueDate || null
@@ -264,12 +266,12 @@ export default function CreateTaskPage() {
           </CardContent>
         </Card>
 
-        {/* الطلبات */}
+        {/* المهام الفرعية */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
-              <span>✅ الطلبات</span>
-              <Badge variant="secondary">{items.filter(i => i.title.trim()).length} طلب</Badge>
+              <span>✅ المهام الفرعية</span>
+              <Badge variant="secondary">{items.filter(i => i.title.trim()).length} مهمة</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -277,7 +279,7 @@ export default function CreateTaskPage() {
               <div key={item.id} className="flex items-center gap-2">
                 <span className="text-muted-foreground w-6">{index + 1}.</span>
                 <Input
-                  placeholder="أدخل الطلب..."
+                  placeholder="أدخل المهمة..."
                   value={item.title}
                   onChange={(e) => updateItem(item.id, e.target.value)}
                 />
@@ -295,7 +297,7 @@ export default function CreateTaskPage() {
             ))}
             <Button type="button" variant="outline" onClick={addItem} className="w-full">
               <PlusIcon className="ml-1 h-4 w-4" />
-              إضافة طلب
+              إضافة مهمة فرعية
             </Button>
           </CardContent>
         </Card>
@@ -321,6 +323,45 @@ export default function CreateTaskPage() {
                 </p>
               </div>
             </label>
+
+            {isGroupTask && (
+              <>
+                {/* نوع الإنجاز */}
+                <div className="p-4 bg-muted/50 rounded-xl space-y-3">
+                  <p className="font-medium text-sm">🎯 نوع الإنجاز</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all text-center ${
+                        completionType === "all"
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent bg-background hover:border-muted-foreground/30"
+                      }`}
+                      onClick={() => setCompletionType("all")}
+                    >
+                      <span className="text-2xl block mb-1">👥</span>
+                      <p className="font-medium text-sm">الجميع</p>
+                      <p className="text-xs text-muted-foreground">
+                        يجب على كل المشاركين التنفيذ
+                      </p>
+                    </div>
+                    <div
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all text-center ${
+                        completionType === "any"
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent bg-background hover:border-muted-foreground/30"
+                      }`}
+                      onClick={() => setCompletionType("any")}
+                    >
+                      <span className="text-2xl block mb-1">👤</span>
+                      <p className="font-medium text-sm">أي شخص</p>
+                      <p className="text-xs text-muted-foreground">
+                        يكفي شخص واحد للتنفيذ
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {isGroupTask && (
               <>

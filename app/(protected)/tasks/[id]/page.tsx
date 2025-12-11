@@ -31,6 +31,7 @@ interface Task {
   description?: string
   task_type: "daily" | "weekly" | "monthly"
   is_group_task: boolean
+  completion_type?: "all" | "any"
   status: "active" | "completed"
   due_date?: string
   completed_at?: string
@@ -132,7 +133,7 @@ export default function TaskDetailPage() {
         } else {
           showToast({
             title: currentlyCompleted ? "↩️ تم التراجع" : "✅ تم الإنجاز",
-            message: currentlyCompleted ? "تم إلغاء التنفيذ" : "تم تحديد الطلب كمنفذ",
+            message: currentlyCompleted ? "تم إلغاء التنفيذ" : "تم تحديد المهمة كمنفذة",
             type: "success"
           })
         }
@@ -271,7 +272,7 @@ export default function TaskDetailPage() {
             )}
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>{task.completed_items} من {task.total_items} طلبات مكتملة</span>
+            <span>{task.completed_items} من {task.total_items} مهام مكتملة</span>
             {task.is_group_task && task.status === "active" && (
               <span className="flex items-center gap-1 text-xs text-primary">
                 <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
@@ -279,6 +280,14 @@ export default function TaskDetailPage() {
               </span>
             )}
           </div>
+          {task.is_group_task && (
+            <div className="mt-3 p-2 bg-muted/50 rounded-lg flex items-center gap-2 text-sm">
+              <span>نوع الإنجاز:</span>
+              <Badge variant="secondary">
+                {task.completion_type === "any" ? "👤 أي شخص يكفي" : "👥 الجميع مطلوب"}
+              </Badge>
+            </div>
+          )}
           {task.due_date && (
             <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
               <CalendarIcon className="h-4 w-4" />
@@ -319,7 +328,7 @@ export default function TaskDetailPage() {
       {/* Task Items */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">✅ الطلبات</CardTitle>
+          <CardTitle className="text-lg">✅ المهام الفرعية</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {task.items.map((item, index) => {
@@ -361,7 +370,7 @@ export default function TaskDetailPage() {
                     {task.is_group_task && (
                       <div className="mt-2">
                         <p className="text-xs text-muted-foreground mb-1">
-                          {completionCount} من {totalMembers} أنجزوا هذا الطلب
+                          {completionCount} من {totalMembers} أنجزوا هذه المهمة
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {task.members.map(member => {
