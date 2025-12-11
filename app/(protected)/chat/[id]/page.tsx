@@ -18,6 +18,12 @@ interface Message {
   created_at: string
   is_read: boolean
   reads: { user_id: string; read_at: string }[]
+  reply_to_id?: string
+  reply_to?: {
+    id: string
+    content: string
+    sender_id: string
+  }
 }
 
 interface OtherUser {
@@ -49,6 +55,7 @@ export default function ChatRoomPage() {
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [otherIsTyping, setOtherIsTyping] = useState(false)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -240,12 +247,14 @@ export default function ChatRoomPage() {
         },
         body: JSON.stringify({
           conversation_id: conversationId,
-          content: text.trim()
+          content: text.trim(),
+          reply_to_id: replyTo?.id || null
         })
       })
 
       if (response.ok) {
         setNewMessage("")
+        setReplyTo(null) // إلغاء الرد بعد الإرسال
         loadMessages()
         inputRef.current?.focus()
       }
@@ -254,6 +263,17 @@ export default function ChatRoomPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  // دالة للرد على رسالة
+  const handleReply = (message: Message) => {
+    setReplyTo(message)
+    inputRef.current?.focus()
+  }
+
+  // إلغاء الرد
+  const cancelReply = () => {
+    setReplyTo(null)
   }
 
   const formatTime = (dateString: string) => {
@@ -373,11 +393,12 @@ export default function ChatRoomPage() {
             {msgs.map((msg, index) => {
               const isMe = msg.sender_id === user?.id
               const showAvatar = !isMe && (index === 0 || msgs[index - 1].sender_id !== msg.sender_id)
+              const replyToMessage = msg.reply_to || (msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null)
 
               return (
                 <div
                   key={msg.id}
-                  className={`flex items-end gap-2 ${isMe ? "flex-row-reverse" : ""}`}
+                  className={`flex items-end gap-2 group ${isMe ? "flex-row-reverse" : ""}`}
                 >
                   {/* Avatar for other user */}
                   {!isMe && (
@@ -392,23 +413,53 @@ export default function ChatRoomPage() {
                   )}
 
                   {/* Message bubble */}
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                      isMe
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "bg-muted rounded-bl-sm"
-                    } ${msg.message_type === "system" ? "bg-green-500/20 text-green-700 text-center max-w-full" : ""}`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                    <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-start" : "justify-end"}`}>
-                      <span className={`text-[10px] ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                        {formatTime(msg.created_at)}
-                      </span>
-                      {isMe && (
-                        <span className={`text-xs font-bold ${msg.is_read ? "text-cyan-300 drop-shadow-[0_0_3px_rgba(0,200,255,0.8)]" : "text-primary-foreground/60"}`}>
-                          {msg.is_read ? "✓✓" : "✓"}
-                        </span>
+                  <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+                    {/* زر الرد */}
+                    {msg.message_type !== "system" && (
+                      <button
+                        onClick={() => handleReply(msg)}
+                        className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-primary mb-1 ${isMe ? "mr-2" : "ml-2"}`}
+                      >
+                        ↩️ رد
+                      </button>
+                    )}
+                    
+                    <div
+                      className={`rounded-2xl px-4 py-2 ${
+                        isMe
+                          ? "bg-primary text-primary-foreground rounded-br-sm"
+                          : "bg-muted rounded-bl-sm"
+                      } ${msg.message_type === "system" ? "bg-green-500/20 text-green-700 text-center max-w-full" : ""}`}
+                    >
+                      {/* عرض الرسالة المُرد عليها */}
+                      {replyToMessage && (
+                        <div 
+                          className={`mb-2 p-2 rounded-lg border-r-2 ${
+                            isMe 
+                              ? "bg-primary-foreground/10 border-primary-foreground/50" 
+                              : "bg-background/50 border-primary"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-medium ${isMe ? "text-primary-foreground/70" : "text-primary"}`}>
+                            {replyToMessage.sender_id === user?.id ? "أنت" : otherUser?.name}
+                          </p>
+                          <p className={`text-xs truncate ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                            {replyToMessage.content.substring(0, 50)}{replyToMessage.content.length > 50 ? "..." : ""}
+                          </p>
+                        </div>
                       )}
+                      
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                      <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-start" : "justify-end"}`}>
+                        <span className={`text-[10px] ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          {formatTime(msg.created_at)}
+                        </span>
+                        {isMe && (
+                          <span className={`text-xs font-bold ${msg.is_read ? "text-cyan-300 drop-shadow-[0_0_3px_rgba(0,200,255,0.8)]" : "text-primary-foreground/60"}`}>
+                            {msg.is_read ? "✓✓" : "✓"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -453,6 +504,26 @@ export default function ChatRoomPage() {
         ))}
       </div>
 
+      {/* شريط الرد */}
+      {replyTo && (
+        <div className="px-4 py-2 border-t bg-muted/50 flex items-center gap-3">
+          <div className="flex-1 border-r-2 border-primary pr-3">
+            <p className="text-xs text-primary font-medium">
+              رد على {replyTo.sender_id === user?.id ? "نفسك" : otherUser?.name}
+            </p>
+            <p className="text-sm text-muted-foreground truncate">
+              {replyTo.content.substring(0, 60)}{replyTo.content.length > 60 ? "..." : ""}
+            </p>
+          </div>
+          <button
+            onClick={cancelReply}
+            className="p-1 hover:bg-destructive/20 rounded-full transition-colors"
+          >
+            <span className="text-destructive text-lg">✕</span>
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t bg-background">
         <form
@@ -464,7 +535,7 @@ export default function ChatRoomPage() {
         >
           <Input
             ref={inputRef}
-            placeholder="اكتب رسالة..."
+            placeholder={replyTo ? "اكتب ردك..." : "اكتب رسالة..."}
             value={newMessage}
             onChange={handleInputChange}
             disabled={sending}

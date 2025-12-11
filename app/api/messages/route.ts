@@ -78,11 +78,27 @@ export async function GET(request: NextRequest) {
       readsMap[r.message_id].push(r)
     })
 
-    // إضافة حالة القراءة للرسائل
+    // جلب الرسائل المُرد عليها
+    const replyToIds = messages?.filter(m => m.reply_to_id).map(m => m.reply_to_id) || []
+    let repliesMap: Record<string, any> = {}
+    
+    if (replyToIds.length > 0) {
+      const { data: replies } = await supabase
+        .from("messages")
+        .select("id, content, sender_id")
+        .in("id", replyToIds)
+      
+      replies?.forEach(r => {
+        repliesMap[r.id] = r
+      })
+    }
+
+    // إضافة حالة القراءة والرد للرسائل
     const messagesWithReads = messages?.map(m => ({
       ...m,
       reads: readsMap[m.id] || [],
-      is_read: (readsMap[m.id] || []).length > 0
+      is_read: (readsMap[m.id] || []).length > 0,
+      reply_to: m.reply_to_id ? repliesMap[m.reply_to_id] : null
     })).reverse() // عكس الترتيب للعرض
 
     // تحديث حالة القراءة
@@ -113,7 +129,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { conversation_id, content, message_type = "text" } = await request.json()
+    const { conversation_id, content, message_type = "text", reply_to_id = null } = await request.json()
 
     if (!conversation_id || !content) {
       return NextResponse.json({ error: "conversation_id and content are required" }, { status: 400 })
@@ -137,14 +153,21 @@ export async function POST(request: NextRequest) {
 
     // إرسال الرسالة
     const adminClient = createAdminClient()
+    const messageData: any = {
+      conversation_id,
+      sender_id: userData.user.id,
+      content,
+      message_type
+    }
+    
+    // إضافة reply_to_id إذا كان موجوداً
+    if (reply_to_id) {
+      messageData.reply_to_id = reply_to_id
+    }
+    
     const { data: message, error } = await adminClient
       .from("messages")
-      .insert({
-        conversation_id,
-        sender_id: userData.user.id,
-        content,
-        message_type
-      })
+      .insert(messageData)
       .select()
       .single()
 

@@ -33,11 +33,20 @@ CREATE TABLE IF NOT EXISTS messages (
     sender_id UUID NOT NULL,
     content TEXT NOT NULL,
     message_type VARCHAR(20) DEFAULT 'text',
+    reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     is_deleted BOOLEAN DEFAULT FALSE,
     metadata JSONB DEFAULT '{}'
 );
+
+-- إضافة عمود الرد للجدول الموجود (للتحديث)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='reply_to_id') THEN
+        ALTER TABLE messages ADD COLUMN reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- 4. جدول حالة قراءة الرسائل
 CREATE TABLE IF NOT EXISTS message_reads (
