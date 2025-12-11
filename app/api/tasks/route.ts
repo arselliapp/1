@@ -233,6 +233,13 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating task:", error)
+      // التحقق من أن الجدول موجود
+      if (error.code === "42P01" || error.message.includes("does not exist")) {
+        return NextResponse.json({ 
+          error: "جداول المهام غير موجودة. يرجى تشغيل SQL في Supabase أولاً",
+          details: "Run database/tasks_schema.sql in Supabase SQL Editor"
+        }, { status: 500 })
+      }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 

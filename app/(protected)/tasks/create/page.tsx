@@ -161,7 +161,15 @@ export default function CreateTaskPage() {
         router.push(`/tasks/${data.task.id}`)
       } else {
         const data = await response.json()
-        showToast({ title: "❌ خطأ", message: data.error || "حدث خطأ", type: "error" })
+        if (data.details?.includes("tasks_schema.sql")) {
+          showToast({ 
+            title: "⚠️ إعداد مطلوب", 
+            message: "يجب تشغيل SQL في Supabase لتفعيل نظام المهام", 
+            type: "error" 
+          })
+        } else {
+          showToast({ title: "❌ خطأ", message: data.error || "حدث خطأ", type: "error" })
+        }
       }
     } catch (err) {
       console.error("Error:", err)
