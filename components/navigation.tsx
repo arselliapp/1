@@ -3,15 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon, MessageSquareIcon, BellIcon, CalendarIcon } from "@/components/icons"
+import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon, MessageSquareIcon, BellIcon, CalendarIcon, ListTodoIcon } from "@/components/icons"
 import { useAuth } from "@/contexts/auth-context"
 
 const navItems = [
   { href: "/dashboard", label: "الرئيسية", icon: HomeIcon },
   { href: "/chat", label: "المحادثات", icon: MessageSquareIcon },
   { href: "/reminders", label: "التنبيهات", icon: CalendarIcon },
+  { href: "/tasks", label: "المهام", icon: ListTodoIcon },
   { href: "/contacts", label: "جهات الاتصال", icon: UsersIcon },
-  { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ]
 
 const adminNavItems = [
