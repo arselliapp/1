@@ -335,6 +335,25 @@ CREATE POLICY "Users can manage their presence" ON user_presence FOR ALL
     USING (user_id = auth.uid());
 
 -- =====================================================
+-- جدول اشتراكات الإشعارات Push
+-- =====================================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    subscription JSONB NOT NULL,
+    endpoint TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, endpoint)
+);
+
+-- فهرس للبحث السريع
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+
+-- تعطيل RLS
+ALTER TABLE push_subscriptions DISABLE ROW LEVEL SECURITY;
+
+-- =====================================================
 -- منح الصلاحيات للـ service_role
 -- =====================================================
 GRANT ALL ON conversations TO service_role;

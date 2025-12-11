@@ -22,6 +22,8 @@ import { NotificationPermission } from "@/components/notification-permission"
 
 import { ReminderChecker } from "@/components/reminder-checker"
 
+import { PushNotificationManager } from "@/components/push-notification-manager"
+
 import { Footer } from "@/components/footer"
 
 import "./globals.css"
@@ -186,6 +188,8 @@ export default function RootLayout({
               <NotificationPermission />
 
               <ReminderChecker />
+
+              <PushNotificationManager />
 
               <Footer />
 
