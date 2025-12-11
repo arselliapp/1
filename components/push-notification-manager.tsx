@@ -113,8 +113,56 @@ export function PushNotificationManager() {
   // حفظ الاشتراك في الخادم
   const saveSubscription = useCallback(async (subscription: PushSubscription) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return false
+      // محاولة الحصول على Session مع إعادة المحاولة
+      let session = null
+      let attempts = 0
+      const maxAttempts = 3
+
+      while (!session && attempts < maxAttempts) {
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.warn(`⚠️ Session error (attempt ${attempts + 1}):`, sessionError)
+        }
+        
+        if (currentSession) {
+          session = currentSession
+          break
+        }
+
+        attempts++
+        if (attempts < maxAttempts) {
+          // انتظار قليل قبل إعادة المحاولة
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          // محاولة تحديث Session
+          await supabase.auth.refreshSession()
+        }
+      }
+
+      if (!session || !session.access_token) {
+        console.error('❌ No valid session found after', maxAttempts, 'attempts')
+        // محاولة استخدام localStorage كـ fallback
+        const tokenKey = 'arselli-auth-token'
+        const tokenData = localStorage.getItem(tokenKey)
+        if (tokenData) {
+          try {
+            const tokenObj = JSON.parse(tokenData)
+            if (tokenObj.access_token) {
+              console.log('🔄 Using token from localStorage as fallback')
+              session = { access_token: tokenObj.access_token }
+            }
+          } catch (e) {
+            console.error('❌ Error parsing token from localStorage:', e)
+          }
+        }
+      }
+
+      if (!session || !session.access_token) {
+        console.error('❌ No valid access token available')
+        return false
+      }
+
+      console.log('✅ Valid session found, saving subscription...')
 
       const response = await fetch('/api/notifications/subscribe', {
         method: 'POST',
@@ -129,7 +177,30 @@ export function PushNotificationManager() {
         console.log('✅ Subscription saved to server')
         return true
       } else {
-        console.error('❌ Failed to save subscription')
+        const errorText = await response.text()
+        console.error('❌ Failed to save subscription:', response.status, errorText)
+        
+        // إذا كان الخطأ 401، حاول تحديث Session
+        if (response.status === 401) {
+          console.log('🔄 Unauthorized, trying to refresh session...')
+          const { data: { session: newSession } } = await supabase.auth.refreshSession()
+          if (newSession && newSession.access_token) {
+            console.log('✅ Session refreshed, retrying...')
+            const retryResponse = await fetch('/api/notifications/subscribe', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${newSession.access_token}`
+              },
+              body: JSON.stringify(subscription.toJSON())
+            })
+            if (retryResponse.ok) {
+              console.log('✅ Subscription saved after retry')
+              return true
+            }
+          }
+        }
+        
         return false
       }
     } catch (error) {
