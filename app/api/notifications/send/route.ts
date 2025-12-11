@@ -79,18 +79,21 @@ export async function POST(request: Request) {
     }
 
     // إرسال الإشعار لجميع الأجهزة
+    // ملاحظة: requireInteraction: false للسماح بالإشعارات في الخلفية
     const payload = JSON.stringify({
       title: title || "إشعار جديد",
       body: body || "لديك إشعار جديد",
       icon: "/icon-192x192.png",
       badge: "/icon-192x192.png",
       tag: data?.requestId || data?.reminderId || "notification",
-      requireInteraction: true,
+      requireInteraction: false, // false للسماح بالإشعارات حتى عندما يكون المتصفح مغلقاً
       data: {
         url: url || defaultUrl,
         ...data,
       },
     })
+    
+    console.log("📦 Payload:", payload)
 
     let successCount = 0
     let sentToSubscriptions = 0
@@ -99,14 +102,20 @@ export async function POST(request: Request) {
     if (subscriptions && subscriptions.length > 0) {
       const sendPromises = subscriptions.map(async (sub) => {
         try {
-          await webpush.sendNotification(sub.subscription, payload)
+          console.log(`📤 Sending to endpoint: ${sub.subscription.endpoint?.slice(0, 50)}...`)
+          const result = await webpush.sendNotification(sub.subscription, payload)
+          console.log(`✅ Notification sent successfully to endpoint`)
           sentToSubscriptions++
           return { success: true }
         } catch (error: any) {
-          console.error("Error sending notification:", error)
+          console.error("❌ Error sending notification:", error)
+          console.error("Error statusCode:", error.statusCode)
+          console.error("Error message:", error.message)
+          console.error("Error body:", error.body)
           
           // حذف الاشتراك إذا كان غير صالح
           if (error.statusCode === 410 || error.statusCode === 404) {
+            console.log(`🗑️ Deleting invalid subscription: ${sub.subscription.endpoint?.slice(0, 50)}...`)
             await adminClient
               .from("push_subscriptions")
               .delete()
@@ -120,6 +129,7 @@ export async function POST(request: Request) {
 
       const results = await Promise.all(sendPromises)
       successCount = results.filter((r) => r.success).length
+      console.log(`📊 Sent ${successCount} of ${subscriptions.length} notifications successfully`)
     }
 
     // حفظ الإشعار في قاعدة البيانات كـ fallback

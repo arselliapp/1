@@ -41,7 +41,7 @@ export function PWAInstallPrompt() {
       
       // عرض البانر بعد 2 ثانية (إجباري)
       setTimeout(() => {
-        setShowPrompt(true)
+          setShowPrompt(true)
       }, 2000)
     }
 
@@ -136,7 +136,7 @@ export function PWAInstallPrompt() {
               <div className="text-xl mb-1">📴</div>
               <p className="text-slate-400 text-xs">بدون نت</p>
             </div>
-          </div>
+        </div>
 
           {/* ملاحظة */}
           <p className="text-slate-500 text-xs mt-4">

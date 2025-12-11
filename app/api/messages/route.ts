@@ -8,6 +8,25 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+function resolveSiteUrl(request: NextRequest) {
+  // ترتيب أولوية الروابط: متغير بيئة عام -> رابط فيرسل -> هوست الطلب
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  const host = request.headers.get("host")
+  if (host) {
+    const protocol = host.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  }
+
+  return ""
+}
+
 // جلب رسائل محادثة معينة
 export async function GET(request: NextRequest) {
   try {
@@ -189,6 +208,7 @@ export async function POST(request: NextRequest) {
       const senderName = userData.user.user_metadata?.full_name || 
                         userData.user.user_metadata?.name || 
                         "مستخدم"
+      const siteUrl = resolveSiteUrl(request)
 
       // حفظ في قاعدة البيانات
       await adminClient.from("notifications").insert({
@@ -203,10 +223,9 @@ export async function POST(request: NextRequest) {
 
       // إرسال Push Notification
       try {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-                       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
-        
-        await fetch(`${siteUrl}/api/notifications/send`, {
+        const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+
+        await fetch(targetUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

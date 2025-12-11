@@ -8,6 +8,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+function resolveSiteUrl(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  const host = request.headers.get("host")
+  if (host) {
+    const protocol = host.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  }
+
+  return ""
+}
+
 // تحديد عنصر كمكتمل
 export async function POST(
   request: NextRequest,
@@ -126,6 +144,7 @@ export async function POST(
       // إرسال إشعار للآخرين
       const completerName = userData.user.user_metadata?.full_name || "مستخدم"
       const otherMembers = members?.filter(m => m.user_id !== userData.user.id) || []
+      const siteUrl = resolveSiteUrl(request)
       
       if (completed && otherMembers.length > 0) {
         // حفظ الإشعارات في قاعدة البيانات
@@ -145,11 +164,11 @@ export async function POST(
         }
 
         // إرسال إشعار push فوري لكل عضو
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ""
-        
         await Promise.all(otherMembers.map(async (m) => {
           try {
-            const response = await fetch(`${siteUrl}/api/notifications/send`, {
+            const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+
+            const response = await fetch(targetUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -249,9 +268,13 @@ export async function POST(
       await adminClient.from("notifications").insert(celebrationNotifications)
 
       // إرسال إشعار push للجميع
+      const siteUrl = resolveSiteUrl(request)
+
       for (const m of allMembers || []) {
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ""}/api/notifications/send`, {
+          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+
+          await fetch(targetUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

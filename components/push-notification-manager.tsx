@@ -69,19 +69,17 @@ export function PushNotificationManager() {
   }, [])
 
   // الاشتراك في Push Notifications
-  const subscribeToPush = useCallback(async (reg: ServiceWorkerRegistration) => {
+  const subscribeToPush = useCallback(async (reg: ServiceWorkerRegistration, retryOnInvalid = true) => {
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    
+    if (!vapidKey) {
+      console.error('❌ VAPID public key not found')
+      return null
+    }
+
     try {
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      
-      if (!vapidKey) {
-        console.error('❌ VAPID public key not found')
-        return null
-      }
+      const applicationServerKey = urlBase64ToUint8Array(vapidKey.trim())
 
-      // تحويل VAPID key
-      const applicationServerKey = urlBase64ToUint8Array(vapidKey)
-
-      // الاشتراك
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey
@@ -89,8 +87,25 @@ export function PushNotificationManager() {
 
       console.log('✅ Push subscription created:', subscription.endpoint)
       return subscription
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Push subscription failed:', error)
+
+      // إذا المفتاح تغير أو الاشتراك قديم: فك الاشتراك الحالي ثم إعادة المحاولة مرة واحدة
+      if (retryOnInvalid && error?.name === 'InvalidAccessError') {
+        try {
+          const existing = await reg.pushManager.getSubscription()
+          if (existing) {
+            console.log('↩️ Unsubscribing stale push subscription then retrying...')
+            await existing.unsubscribe()
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to unsubscribe stale subscription', e)
+        }
+
+        // محاولة ثانية بدون إعادة الدخول في حلقة
+        return await subscribeToPush(reg, false)
+      }
+
       return null
     }
   }, [])

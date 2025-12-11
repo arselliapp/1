@@ -2,7 +2,8 @@
 
 // استقبال رسائل Push
 self.addEventListener('push', function(event) {
-  console.log('🔔 Push notification received!');
+  console.log('🔔 Push notification received!', event);
+  console.log('🔔 Event data:', event.data ? 'Has data' : 'No data');
   
   let notificationData = {
     title: 'إشعار جديد',
@@ -10,7 +11,7 @@ self.addEventListener('push', function(event) {
     icon: '/icon-192x192.png',
     badge: '/icon-192x192.png',
     tag: 'notification-' + Date.now(),
-    requireInteraction: true,
+    requireInteraction: false, // تغيير إلى false للسماح بالإشعارات في الخلفية
     vibrate: [200, 100, 200],
     data: {
       url: '/dashboard'
@@ -20,13 +21,14 @@ self.addEventListener('push', function(event) {
   if (event.data) {
     try {
       const data = event.data.json();
+      console.log('🔔 Parsed push data:', data);
       notificationData = {
         title: data.title || notificationData.title,
         body: data.body || notificationData.body,
         icon: data.icon || notificationData.icon,
         badge: data.badge || notificationData.badge,
         tag: data.tag || notificationData.tag,
-        requireInteraction: data.requireInteraction !== undefined ? data.requireInteraction : true,
+        requireInteraction: false, // false للسماح بالإشعارات في الخلفية
         vibrate: [200, 100, 200],
         data: {
           url: data.data?.url || '/dashboard',
@@ -46,22 +48,42 @@ self.addEventListener('push', function(event) {
         ]
       };
     } catch (e) {
-      console.error('Error parsing push data:', e);
+      console.error('❌ Error parsing push data:', e);
+      // إذا فشل parsing، استخدم البيانات النصية
+      if (event.data.text) {
+        try {
+          const textData = JSON.parse(event.data.text());
+          notificationData.title = textData.title || notificationData.title;
+          notificationData.body = textData.body || notificationData.body;
+        } catch (e2) {
+          console.error('❌ Error parsing text data:', e2);
+        }
+      }
     }
   }
 
+  console.log('🔔 Showing notification:', notificationData.title, notificationData.body);
+
+  const notificationPromise = self.registration.showNotification(notificationData.title, {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    badge: notificationData.badge,
+    tag: notificationData.tag,
+    requireInteraction: notificationData.requireInteraction,
+    vibrate: notificationData.vibrate,
+    data: notificationData.data,
+    actions: notificationData.actions,
+    dir: 'rtl',
+    lang: 'ar',
+    silent: false, // تأكد من أن الصوت يعمل
+    sound: '/notification.mp3' // إذا كان لديك ملف صوتي
+  });
+
   event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
-      body: notificationData.body,
-      icon: notificationData.icon,
-      badge: notificationData.badge,
-      tag: notificationData.tag,
-      requireInteraction: notificationData.requireInteraction,
-      vibrate: notificationData.vibrate,
-      data: notificationData.data,
-      actions: notificationData.actions,
-      dir: 'rtl',
-      lang: 'ar'
+    notificationPromise.then(() => {
+      console.log('✅ Notification shown successfully');
+    }).catch((error) => {
+      console.error('❌ Error showing notification:', error);
     })
   );
 });
