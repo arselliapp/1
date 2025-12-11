@@ -56,10 +56,15 @@ export default function ChatRoomPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [otherIsTyping, setOtherIsTyping] = useState(false)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isFirstLoad = useRef(true)
+  const lastMessageCount = useRef(0)
+  const userScrolledUp = useRef(false)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   // تحميل المحادثة والرسائل
   useEffect(() => {
@@ -81,13 +86,42 @@ export default function ChatRoomPage() {
     }
   }, [user, conversationId])
 
-  // التمرير لآخر رسالة
+  // التمرير لآخر رسالة (فقط عند أول تحميل أو رسالة جديدة)
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    // أول تحميل
+    if (isFirstLoad.current && messages.length > 0) {
+      scrollToBottom(false)
+      isFirstLoad.current = false
+      lastMessageCount.current = messages.length
+      return
+    }
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    // رسالة جديدة وردت
+    if (messages.length > lastMessageCount.current) {
+      const newMessage = messages[messages.length - 1]
+      // التمرير فقط إذا كانت رسالة منّي أو المستخدم لم يتصفح للأعلى
+      if (newMessage?.sender_id === user?.id || !userScrolledUp.current) {
+        scrollToBottom(true)
+      }
+    }
+    
+    lastMessageCount.current = messages.length
+  }, [messages, user?.id])
+
+  const scrollToBottom = (smooth: boolean = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" })
+    userScrolledUp.current = false
+  }
+
+  // تتبع إذا المستخدم تصفح للأعلى
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      // إذا كان المستخدم بعيد عن الأسفل بأكثر من 100 بكسل
+      userScrolledUp.current = distanceFromBottom > 100
+      setShowScrollButton(distanceFromBottom > 200)
+    }
   }
 
   const updatePresence = async (isOnline: boolean, currentConv: string | null) => {
@@ -349,7 +383,7 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] -mx-4 -mt-4" dir="rtl">
+    <div className="flex flex-col h-[calc(100vh-140px)] -mx-4 -mt-4 relative" dir="rtl">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b bg-background/95 backdrop-blur sticky top-0 z-10">
         <Button variant="ghost" size="icon" onClick={() => router.push("/chat")}>
@@ -379,7 +413,11 @@ export default function ChatRoomPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
             {/* Date separator */}
@@ -487,6 +525,17 @@ export default function ChatRoomPage() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* زر العودة لآخر رسالة */}
+      {showScrollButton && (
+        <button
+          onClick={() => scrollToBottom(true)}
+          className="absolute bottom-36 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm hover:bg-primary/90 transition-colors z-20"
+        >
+          <span>⬇️</span>
+          <span>آخر الرسائل</span>
+        </button>
+      )}
 
       {/* Quick Replies */}
       <div className="flex gap-2 px-4 py-2 overflow-x-auto">
