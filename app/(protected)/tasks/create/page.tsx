@@ -372,7 +372,9 @@ export default function CreateTaskPage() {
                           }`}
                           onClick={() => toggleMember(contact)}
                         >
-                          <Checkbox checked={isSelected} />
+                          <div className="pointer-events-none">
+                            <Checkbox checked={isSelected} />
+                          </div>
                           <Avatar className="h-9 w-9">
                             <AvatarImage src={contact.avatar} />
                             <AvatarFallback>{contact.name[0]}</AvatarFallback>
