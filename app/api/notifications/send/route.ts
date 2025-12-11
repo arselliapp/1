@@ -53,17 +53,21 @@ export async function POST(request: Request) {
     console.log(`📤 Sending notification to user: ${userId}`)
     console.log(`Title: ${title}, Body: ${body}`)
 
-    // الحصول على اشتراكات المستخدم المستهدف
-    const { data: subscriptions, error: fetchError } = await supabase
+    // الحصول على اشتراكات المستخدم المستهدف (باستخدام Admin للتجاوز RLS)
+    const { data: subscriptions, error: fetchError } = await adminClient
       .from("push_subscriptions")
       .select("subscription")
       .eq("user_id", userId)
 
     if (fetchError) {
       console.error("❌ Error fetching subscriptions:", fetchError)
+      console.error("Error details:", fetchError.message, fetchError.code)
     }
 
     console.log(`✅ Found ${subscriptions?.length || 0} subscription(s) for user: ${userId}`)
+    if (subscriptions && subscriptions.length > 0) {
+      console.log("First subscription endpoint:", subscriptions[0]?.subscription?.endpoint?.slice(0, 50))
+    }
 
     // تحديد الرابط المناسب بناءً على نوع الإشعار
     const notificationType = data?.type || "general"
@@ -103,10 +107,11 @@ export async function POST(request: Request) {
           
           // حذف الاشتراك إذا كان غير صالح
           if (error.statusCode === 410 || error.statusCode === 404) {
-            await supabase
+            await adminClient
               .from("push_subscriptions")
               .delete()
               .eq("endpoint", sub.subscription.endpoint)
+            console.log("🗑️ Deleted invalid subscription")
           }
           
           return { success: false, error: error.message }

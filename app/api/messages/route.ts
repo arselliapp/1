@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
                         userData.user.user_metadata?.name || 
                         "مستخدم"
 
+      // حفظ في قاعدة البيانات
       await adminClient.from("notifications").insert({
         user_id: otherParticipant.user_id,
         title: `💬 رسالة جديدة من ${senderName}`,
@@ -199,6 +200,31 @@ export async function POST(request: NextRequest) {
         data: { conversationId: conversation_id, senderId: userData.user.id },
         is_read: false
       })
+
+      // إرسال Push Notification
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+        
+        await fetch(`${siteUrl}/api/notifications/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: otherParticipant.user_id,
+            title: `💬 ${senderName}`,
+            body: content.length > 100 ? content.substring(0, 100) + "..." : content,
+            url: `/chat/${conversation_id}`,
+            data: { 
+              type: "message",
+              conversationId: conversation_id, 
+              senderId: userData.user.id 
+            }
+          })
+        })
+        console.log("✅ Push notification sent for message")
+      } catch (pushError) {
+        console.log("Push notification failed:", pushError)
+      }
     }
 
     return NextResponse.json({ message })
