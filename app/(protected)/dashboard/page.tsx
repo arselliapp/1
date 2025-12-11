@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { UsersIcon, SendIcon, MessageSquareIcon, CalendarIcon, ClockIcon } from "@/components/icons"
+import { UsersIcon, SendIcon, MessageSquareIcon, CalendarIcon, ClockIcon, SettingsIcon, ListTodoIcon, PlusIcon } from "@/components/icons"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase/client"
@@ -11,10 +11,12 @@ import { supabase } from "@/lib/supabase/client"
 export default function DashboardPage() {
   const { user } = useAuth()
   const [stats, setStats] = useState({
-    contacts: 0,
     conversations: 0,
+    unreadMessages: 0,
     reminders: 0,
-    pendingReminders: 0
+    pendingReminders: 0,
+    tasks: 0,
+    activeTasks: 0
   })
   const [loading, setLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -51,44 +53,59 @@ export default function DashboardPage() {
 
     try {
       // جلب الإحصائيات بالتوازي
-      const [contactsResult, conversationsResult, remindersResult, pendingResult] = await Promise.all([
-        // جهات الاتصال
-        supabase
-          .from("contacts")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("status", "accepted"),
+      const [conversationsResult, unreadResult, remindersResult, pendingResult, tasksResult, activeTasksResult] = await Promise.all([
         // المحادثات
         supabase
           .from("conversation_participants")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id),
-        // التنبيهات المرسلة
+        // الرسائل غير المقروءة
+        supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .neq("sender_id", user.id)
+          .eq("is_read", false),
+        // التنبيهات
         supabase
           .from("reminders")
           .select("id", { count: "exact", head: true })
-          .eq("sender_id", user.id),
+          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`),
         // التنبيهات المعلقة (الواردة)
         supabase
           .from("reminders")
           .select("id", { count: "exact", head: true })
           .eq("recipient_id", user.id)
-          .eq("status", "pending")
+          .eq("status", "pending"),
+        // المهام
+        supabase
+          .from("task_assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id),
+        // المهام النشطة
+        supabase
+          .from("task_assignments")
+          .select("task_id, tasks!inner(status)")
+          .eq("user_id", user.id)
+          .eq("tasks.status", "active")
       ])
 
       const newStats = {
-        contacts: contactsResult.count || 0,
         conversations: conversationsResult.count || 0,
+        unreadMessages: unreadResult.count || 0,
         reminders: remindersResult.count || 0,
-        pendingReminders: pendingResult.count || 0
+        pendingReminders: pendingResult.count || 0,
+        tasks: tasksResult.count || 0,
+        activeTasks: activeTasksResult.data?.length || 0
       }
 
       // كشف التغييرات
       const changed = new Set<string>()
-      if (newStats.contacts !== prevStatsRef.current.contacts) changed.add("contacts")
       if (newStats.conversations !== prevStatsRef.current.conversations) changed.add("conversations")
+      if (newStats.unreadMessages !== prevStatsRef.current.unreadMessages) changed.add("conversations")
       if (newStats.reminders !== prevStatsRef.current.reminders) changed.add("reminders")
-      if (newStats.pendingReminders !== prevStatsRef.current.pendingReminders) changed.add("pendingReminders")
+      if (newStats.pendingReminders !== prevStatsRef.current.pendingReminders) changed.add("reminders")
+      if (newStats.tasks !== prevStatsRef.current.tasks) changed.add("tasks")
+      if (newStats.activeTasks !== prevStatsRef.current.activeTasks) changed.add("tasks")
 
       if (changed.size > 0) {
         setChangedStats(changed)
@@ -106,10 +123,39 @@ export default function DashboardPage() {
   }
 
   const statsData = [
-    { key: "contacts", label: "جهات الاتصال", value: stats.contacts.toString(), icon: UsersIcon, href: "/contacts", color: "text-blue-400", bgColor: "from-blue-500/20 to-indigo-500/20", borderColor: "border-blue-500/30" },
-    { key: "conversations", label: "المحادثات", value: stats.conversations.toString(), icon: MessageSquareIcon, href: "/chat", color: "text-emerald-400", bgColor: "from-emerald-500/20 to-teal-500/20", borderColor: "border-emerald-500/30" },
-    { key: "reminders", label: "التنبيهات المرسلة", value: stats.reminders.toString(), icon: CalendarIcon, href: "/reminders?tab=sent", color: "text-amber-400", bgColor: "from-amber-500/20 to-orange-500/20", borderColor: "border-amber-500/30" },
-    { key: "pendingReminders", label: "تنبيهات معلقة", value: stats.pendingReminders.toString(), icon: ClockIcon, href: "/reminders?tab=pending", color: "text-purple-400", bgColor: "from-purple-500/20 to-pink-500/20", borderColor: "border-purple-500/30" },
+    { 
+      key: "conversations", 
+      label: "المحادثات", 
+      value: stats.conversations.toString(), 
+      icon: MessageSquareIcon, 
+      href: "/chat", 
+      color: "text-emerald-400", 
+      bgColor: "from-emerald-500/20 to-teal-500/20", 
+      borderColor: "border-emerald-500/30",
+      badge: stats.unreadMessages > 0 ? stats.unreadMessages : null
+    },
+    { 
+      key: "reminders", 
+      label: "التنبيهات", 
+      value: stats.reminders.toString(), 
+      icon: CalendarIcon, 
+      href: "/reminders", 
+      color: "text-amber-400", 
+      bgColor: "from-amber-500/20 to-orange-500/20", 
+      borderColor: "border-amber-500/30",
+      badge: stats.pendingReminders > 0 ? stats.pendingReminders : null
+    },
+    { 
+      key: "tasks", 
+      label: "المهام", 
+      value: stats.tasks.toString(), 
+      icon: ListTodoIcon, 
+      href: "/tasks", 
+      color: "text-purple-400", 
+      bgColor: "from-purple-500/20 to-pink-500/20", 
+      borderColor: "border-purple-500/30",
+      badge: stats.activeTasks > 0 ? stats.activeTasks : null
+    },
   ]
 
   if (!user) {
@@ -128,23 +174,31 @@ export default function DashboardPage() {
     <div className="space-y-8" dir="rtl">
       {/* Welcome Section */}
       <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            مرحباً، {user?.user_metadata?.full_name?.split(" ")[0] || user?.user_metadata?.name?.split(" ")[0] || "مستخدم"}
-          </h1>
-          {isUpdating && (
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="جاري التحديث..." />
-          )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              مرحباً، {user?.user_metadata?.full_name?.split(" ")[0] || user?.user_metadata?.name?.split(" ")[0] || "مستخدم"}
+            </h1>
+            {isUpdating && (
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="جاري التحديث..." />
+            )}
+          </div>
+          <Link
+            href="/settings"
+            className="p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+            title="الإعدادات"
+          >
+            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
+          </Link>
         </div>
         <p className="text-muted-foreground">إليك نظرة عامة على حسابك اليوم</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {statsData.map((stat, index) => {
           const Icon = stat.icon
           const isChanged = changedStats.has(stat.key)
-          const hasPending = stat.key === "pendingReminders" && stats.pendingReminders > 0
 
           return (
             <Link
@@ -154,24 +208,34 @@ export default function DashboardPage() {
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <Card className={cn(
-                "bg-gradient-to-br border transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md",
+                "bg-gradient-to-br border transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md relative overflow-hidden",
                 stat.bgColor,
                 stat.borderColor,
-                isChanged && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                hasPending && "ring-2 ring-purple-500/50"
+                isChanged && "ring-2 ring-primary ring-offset-2 ring-offset-background"
               )}>
+                {/* شارة الإشعارات */}
+                {stat.badge && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <span className="flex h-6 w-6 items-center justify-center">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold">
+                        {stat.badge > 9 ? "9+" : stat.badge}
+                      </span>
+                    </span>
+                  </div>
+                )}
                 <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-center text-center gap-2">
                     <div className={cn(
-                      "p-2 rounded-lg bg-secondary/50 transition-transform duration-300",
+                      "p-3 rounded-xl bg-secondary/50 transition-transform duration-300",
                       stat.color,
                       isChanged && "scale-110"
                     )}>
-                      <Icon className="w-5 h-5" />
+                      <Icon className="w-6 h-6" />
                     </div>
                     <div>
                       <p className={cn(
-                        "text-2xl font-bold text-foreground transition-all duration-300",
+                        "text-3xl font-bold text-foreground transition-all duration-300",
                         isChanged && "scale-110 text-primary"
                       )}>
                         {stat.value}
@@ -234,18 +298,18 @@ export default function DashboardPage() {
             </div>
           </Link>
           
-          {/* عرض التنبيهات */}
+          {/* مهمة جديدة */}
           <Link
-            href="/reminders"
+            href="/tasks/create"
             className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-l from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
           >
             <div className="p-3 rounded-xl bg-purple-500/20">
-              <SendIcon className="w-6 h-6 text-purple-400" />
+              <ListTodoIcon className="w-6 h-6 text-purple-400" />
             </div>
             <div>
-              <p className="font-medium text-foreground">عرض التنبيهات</p>
+              <p className="font-medium text-foreground">مهمة جديدة</p>
               <p className="text-sm text-muted-foreground">
-                {stats.pendingReminders > 0 ? `لديك ${stats.pendingReminders} تنبيه معلق` : "إدارة التنبيهات"}
+                {stats.activeTasks > 0 ? `لديك ${stats.activeTasks} مهمة نشطة` : "أنشئ مهمة جديدة"}
               </p>
             </div>
           </Link>

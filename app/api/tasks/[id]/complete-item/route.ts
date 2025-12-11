@@ -124,11 +124,28 @@ export async function POST(
           body: `${completerName} أنجز: ${item.title}`,
           type: "task_update",
           url: `/tasks/${taskId}`,
-          data: { taskId, itemId: item_id },
+          data: { taskId, itemId: item_id, realtime: true },
           is_read: false
         }))
 
         await adminClient.from("notifications").insert(notifications)
+
+        // إرسال إشعار push فوري
+        for (const m of otherMembers) {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ""}/api/notifications/send`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: m.user_id,
+                title: `✅ تم إنجاز طلب`,
+                body: `${completerName} أنجز: ${item.title}`,
+                url: `/tasks/${taskId}`,
+                data: { taskId, itemId: item_id }
+              })
+            })
+          } catch (e) { /* تجاهل أخطاء الإشعارات */ }
+        }
       }
     } else {
       // للمهام الفردية: تحديث مباشر
@@ -194,11 +211,28 @@ export async function POST(
         body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
         type: "task_completed",
         url: `/tasks/${taskId}`,
-        data: { taskId, completed: true },
+        data: { taskId, completed: true, celebration: true },
         is_read: false
       })) || []
 
       await adminClient.from("notifications").insert(celebrationNotifications)
+
+      // إرسال إشعار push للجميع
+      for (const m of allMembers || []) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ""}/api/notifications/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: m.user_id,
+              title: `🎉 مبروك! تم إنجاز المهمة`,
+              body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
+              url: `/tasks/${taskId}`,
+              data: { taskId, completed: true, celebration: true }
+            })
+          })
+        } catch (e) { /* تجاهل أخطاء الإشعارات */ }
+      }
 
       return NextResponse.json({ 
         success: true, 

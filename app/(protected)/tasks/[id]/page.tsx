@@ -63,8 +63,19 @@ export default function TaskDetailPage() {
   useEffect(() => {
     const handleNewNotification = () => loadTask()
     window.addEventListener('newNotification', handleNewNotification)
-    return () => window.removeEventListener('newNotification', handleNewNotification)
-  }, [user, taskId])
+    
+    // تحديث تلقائي كل 5 ثواني للمهام الجماعية
+    const interval = setInterval(() => {
+      if (task?.is_group_task && task?.status === "active") {
+        loadTask()
+      }
+    }, 5000)
+    
+    return () => {
+      window.removeEventListener('newNotification', handleNewNotification)
+      clearInterval(interval)
+    }
+  }, [user, taskId, task?.is_group_task, task?.status])
 
   const loadTask = async () => {
     try {
@@ -239,16 +250,35 @@ export default function TaskDetailPage() {
               {task.is_group_task && (
                 <Badge variant="outline">
                   <UsersIcon className="ml-1 h-3 w-3" />
-                  جماعية
+                  جماعية ({task.members.length} مشارك)
                 </Badge>
               )}
             </div>
-            <span className="text-2xl font-bold">{task.progress}%</span>
+            <div className="text-left">
+              <span className="text-3xl font-bold text-primary">{task.progress}%</span>
+            </div>
           </div>
-          <Progress value={task.progress} className="h-3 mb-2" />
-          <p className="text-sm text-muted-foreground">
-            {task.completed_items} من {task.total_items} طلبات مكتملة
-          </p>
+          <div className="relative h-4 mb-3 bg-secondary rounded-full overflow-hidden">
+            <div 
+              className="absolute top-0 right-0 h-full bg-gradient-to-l from-primary to-primary/70 transition-all duration-500 rounded-full"
+              style={{ width: `${task.progress}%` }}
+            />
+            {task.progress > 0 && task.progress < 100 && (
+              <div 
+                className="absolute top-0 h-full w-1 bg-white/50 animate-pulse"
+                style={{ right: `${task.progress}%`, transform: "translateX(50%)" }}
+              />
+            )}
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>{task.completed_items} من {task.total_items} طلبات مكتملة</span>
+            {task.is_group_task && task.status === "active" && (
+              <span className="flex items-center gap-1 text-xs text-primary">
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                تحديث تلقائي
+              </span>
+            )}
+          </div>
           {task.due_date && (
             <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
               <CalendarIcon className="h-4 w-4" />
