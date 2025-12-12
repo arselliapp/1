@@ -44,8 +44,8 @@ export function Navigation() {
       {/* Desktop Header */}
       <div className="hidden md:flex items-center justify-between gap-3 p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-            <SendIcon className="w-5 h-5 text-white" />
+        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+          <SendIcon className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-foreground">{language === "ar" ? "ارسل لي" : "Arselli"}</span>
         </div>
@@ -92,6 +92,25 @@ export function Navigation() {
             </Link>
           )
         })}
+        
+        {/* Settings and Language Toggle - Mobile */}
+        <div className="md:hidden flex items-center gap-2">
+          <Link
+            href="/settings"
+            className={cn(
+              "flex flex-col items-center gap-1 p-3 rounded-xl transition-colors",
+              pathname === "/settings"
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+            )}
+          >
+            <SettingsIcon className="w-5 h-5" />
+            <span className="text-xs font-medium">{language === "ar" ? "الإعدادات" : "Settings"}</span>
+          </Link>
+          <div className="p-3">
+            <LanguageToggle />
+          </div>
+        </div>
       </div>
 
       {/* User Profile - Desktop */}
@@ -108,19 +127,20 @@ export function Navigation() {
             <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
+          <Link
+            href="/settings"
+            className={cn(
+              "p-2 text-muted-foreground hover:text-foreground transition-colors",
+              pathname === "/settings" && "text-primary"
+            )}
+            title={language === "ar" ? "الإعدادات" : "Settings"}
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </Link>
           <button onClick={signOut} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
             <LogOutIcon className="w-4 h-4" />
           </button>
         </div>
-        {/* Language Toggle - Mobile */}
-        <div className="md:hidden flex justify-center mt-2">
-          <LanguageToggle />
-        </div>
-      </div>
-      
-      {/* Language Toggle - Mobile Bottom */}
-      <div className="md:hidden flex justify-center p-2 border-t border-border">
-        <LanguageToggle />
       </div>
     </nav>
   )

@@ -267,13 +267,13 @@ export async function POST(request: NextRequest) {
         console.warn("[tasks/route] Column not found error, retrying without optional fields")
         // إعادة المحاولة بدون أي حقول اختيارية
         const retryTaskData = {
-          creator_id: userData.user.id,
-          title,
-          description,
-          task_type,
-          is_group_task: is_group_task && member_ids.length > 0,
-          due_date,
-          status: "active"
+            creator_id: userData.user.id,
+            title,
+            description,
+            task_type,
+            is_group_task: is_group_task && member_ids.length > 0,
+            due_date,
+            status: "active"
         }
         
         const { data: retryTask, error: retryError } = await adminClient
@@ -285,11 +285,11 @@ export async function POST(request: NextRequest) {
         if (retryError) {
           console.error("[tasks/route] Retry also failed:", retryError)
           return NextResponse.json({ error: retryError.message }, { status: 500 })
-        }
+            }
         
         task = retryTask
       } else {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
       }
     } else {
       task = taskResult

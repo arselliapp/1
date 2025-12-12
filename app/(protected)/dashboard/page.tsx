@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UsersIcon, SendIcon, MessageSquareIcon, CalendarIcon, ClockIcon, SettingsIcon, ListTodoIcon, PlusIcon } from "@/components/icons"
 import Link from "next/link"
@@ -10,6 +12,8 @@ import { supabase } from "@/lib/supabase/client"
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
   const [stats, setStats] = useState({
     conversations: 0,
     unreadMessages: 0,
@@ -109,7 +113,7 @@ export default function DashboardPage() {
       if (unreadResult && !unreadResult.error) {
         unreadCount = unreadResult.count || 0
       }
-      
+
       const newStats = {
         conversations: conversationsResult.count || 0,
         unreadMessages: unreadCount,
@@ -146,7 +150,7 @@ export default function DashboardPage() {
   const statsData = [
     { 
       key: "conversations", 
-      label: "المحادثات", 
+      label: t.conversations, 
       value: stats.conversations.toString(), 
       icon: MessageSquareIcon, 
       href: "/chat", 
@@ -157,7 +161,7 @@ export default function DashboardPage() {
     },
     { 
       key: "reminders", 
-      label: "التنبيهات", 
+      label: t.remindersCount, 
       value: stats.reminders.toString(), 
       icon: CalendarIcon, 
       href: "/reminders", 
@@ -168,7 +172,7 @@ export default function DashboardPage() {
     },
     { 
       key: "tasks", 
-      label: "المهام", 
+      label: t.tasksCount, 
       value: stats.tasks.toString(), 
       icon: ListTodoIcon, 
       href: "/tasks", 
@@ -180,7 +184,7 @@ export default function DashboardPage() {
   ]
 
   if (!user) {
-    return <div className="text-center text-red-500">خطأ: لم يتم تحميل بيانات المستخدم.</div>
+    return <div className="text-center text-red-500">{t.errorLoadingUser}</div>
   }
 
   if (loading) {
@@ -191,28 +195,36 @@ export default function DashboardPage() {
     )
   }
 
+  const welcomeText = language === "ar" 
+    ? `مرحباً، ${user?.user_metadata?.full_name?.split(" ")[0] || user?.user_metadata?.name?.split(" ")[0] || "مستخدم"}`
+    : `Welcome, ${user?.user_metadata?.full_name?.split(" ")[0] || user?.user_metadata?.name?.split(" ")[0] || "User"}`
+  const overviewText = language === "ar" 
+    ? "إليك نظرة عامة على حسابك اليوم"
+    : "Here's an overview of your account today"
+  const updatingText = language === "ar" ? "جاري التحديث..." : "Updating..."
+
   return (
-    <div className="space-y-8" dir="rtl">
+    <div className={`space-y-8 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Welcome Section */}
       <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              مرحباً، {user?.user_metadata?.full_name?.split(" ")[0] || user?.user_metadata?.name?.split(" ")[0] || "مستخدم"}
+              {welcomeText}
             </h1>
             {isUpdating && (
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="جاري التحديث..." />
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title={updatingText} />
             )}
           </div>
           <Link
             href="/settings"
             className="p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
-            title="الإعدادات"
+            title={t.settings}
           >
             <SettingsIcon className="w-5 h-5 text-muted-foreground" />
           </Link>
         </div>
-        <p className="text-muted-foreground">إليك نظرة عامة على حسابك اليوم</p>
+        <p className="text-muted-foreground">{overviewText}</p>
       </div>
 
       {/* Stats Grid */}
@@ -274,63 +286,67 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <Card className="bg-card border-border animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: "400ms" }}>
         <CardHeader>
-          <CardTitle className="text-foreground">إجراءات سريعة</CardTitle>
+          <CardTitle className="text-foreground">{t.quickActions}</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* دردشة جديدة */}
+          {/* New Chat */}
           <Link
             href="/contacts"
-            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-l from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 hover:border-emerald-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+            className={`flex items-center gap-4 p-4 rounded-xl bg-gradient-to-${language === "ar" ? "l" : "r"} from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 hover:border-emerald-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300`}
           >
             <div className="p-3 rounded-xl bg-emerald-500/20">
               <MessageSquareIcon className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
-              <p className="font-medium text-foreground">دردشة جديدة</p>
-              <p className="text-sm text-muted-foreground">ابدأ محادثة مع جهة اتصال</p>
+              <p className="font-medium text-foreground">{t.newChat}</p>
+              <p className="text-sm text-muted-foreground">{t.newChatDesc}</p>
             </div>
           </Link>
           
-          {/* إرسال تنبيه */}
+          {/* Send Reminder */}
           <Link
             href="/send-reminder"
-            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-l from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:border-amber-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+            className={`flex items-center gap-4 p-4 rounded-xl bg-gradient-to-${language === "ar" ? "l" : "r"} from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:border-amber-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300`}
           >
             <div className="p-3 rounded-xl bg-amber-500/20">
               <CalendarIcon className="w-6 h-6 text-amber-400" />
             </div>
             <div>
-              <p className="font-medium text-foreground">إرسال تنبيه</p>
-              <p className="text-sm text-muted-foreground">أرسل دعوة أو تذكير</p>
+              <p className="font-medium text-foreground">{t.sendReminder}</p>
+              <p className="text-sm text-muted-foreground">{t.sendReminderDesc}</p>
             </div>
           </Link>
           
-          {/* إضافة جهة اتصال */}
+          {/* Add Contact */}
           <Link
             href="/contacts"
-            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-l from-blue-500/20 to-indigo-500/20 border border-blue-500/30 hover:border-blue-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+            className={`flex items-center gap-4 p-4 rounded-xl bg-gradient-to-${language === "ar" ? "l" : "r"} from-blue-500/20 to-indigo-500/20 border border-blue-500/30 hover:border-blue-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300`}
           >
             <div className="p-3 rounded-xl bg-blue-500/20">
               <UsersIcon className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <p className="font-medium text-foreground">إضافة جهة اتصال</p>
-              <p className="text-sm text-muted-foreground">أضف جهة اتصال جديدة</p>
+              <p className="font-medium text-foreground">{t.addContact}</p>
+              <p className="text-sm text-muted-foreground">{t.addContactDesc}</p>
             </div>
           </Link>
           
-          {/* مهمة جديدة */}
+          {/* New Task */}
           <Link
             href="/tasks/create"
-            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-l from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+            className={`flex items-center gap-4 p-4 rounded-xl bg-gradient-to-${language === "ar" ? "l" : "r"} from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300`}
           >
             <div className="p-3 rounded-xl bg-purple-500/20">
               <ListTodoIcon className="w-6 h-6 text-purple-400" />
             </div>
             <div>
-              <p className="font-medium text-foreground">مهمة جديدة</p>
+              <p className="font-medium text-foreground">{t.newTask}</p>
               <p className="text-sm text-muted-foreground">
-                {stats.activeTasks > 0 ? `لديك ${stats.activeTasks} مهمة نشطة` : "أنشئ مهمة جديدة"}
+                {stats.activeTasks > 0 
+                  ? (language === "ar" 
+                      ? `لديك ${stats.activeTasks} مهمة نشطة` 
+                      : `You have ${stats.activeTasks} active tasks`)
+                  : t.newTaskDesc}
               </p>
             </div>
           </Link>

@@ -175,11 +175,11 @@ export default function RootLayout({
 
           <LanguageProvider>
 
-            <AuthProvider>
+          <AuthProvider>
 
-              <ToastProvider>
+            <ToastProvider>
 
-                {children}
+              {children}
 
               <PhoneNumberModal />
 
@@ -197,9 +197,9 @@ export default function RootLayout({
 
               <Footer />
 
-              </ToastProvider>
+            </ToastProvider>
 
-            </AuthProvider>
+          </AuthProvider>
 
           </LanguageProvider>
 
