@@ -70,25 +70,33 @@ export default function AdminPage() {
     type: "contact" | "user"
   } | null>(null)
 
-  // التحقق من الـ session المحفوظة
+  // التحقق من الـ session المحفوظة - فقط عند تحميل الصفحة لأول مرة
   useEffect(() => {
-    const savedAuth = sessionStorage.getItem("admin_authenticated")
-    if (savedAuth === "true") {
-      setIsAuthenticated(true)
-    }
+    // مسح المصادقة السابقة عند تحميل الصفحة
+    sessionStorage.removeItem("admin_authenticated")
+    setIsAuthenticated(false)
   }, [])
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (pin === ADMIN_PIN) {
       setIsAuthenticated(true)
-      sessionStorage.setItem("admin_authenticated", "true")
+      // لا نحفظ في sessionStorage - نطلب الرقم السري في كل مرة
       setPinError("")
+      setPin("")
     } else {
       setPinError(t.incorrectPin)
       setPin("")
     }
   }
+
+  // مسح المصادقة عند الخروج من الصفحة
+  useEffect(() => {
+    return () => {
+      setIsAuthenticated(false)
+      sessionStorage.removeItem("admin_authenticated")
+    }
+  }, [])
 
   useEffect(() => {
     if (user && isAuthenticated) {
