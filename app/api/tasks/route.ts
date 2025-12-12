@@ -23,12 +23,7 @@ function resolveSiteUrl(request: NextRequest) {
     return `${protocol}://${host}`
   }
 
-  // fallback to request origin if available
-  try {
-    return request.nextUrl.origin
-  } catch {
-    return ""
-  }
+  return ""
 }
 
 // أنواع المهام
@@ -375,33 +370,30 @@ export async function POST(request: NextRequest) {
       if (notifications.length > 0) {
         await adminClient.from("notifications").insert(notifications)
 
-        // إرسال Push Notification فوري - نفس طريقة التنبيهات
-        try {
-          const siteUrl = resolveSiteUrl(request)
-          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-          
-          await Promise.all(
-            targetMembers.map(async (uid: string) => {
-              try {
-                await fetch(targetUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    userId: uid,
-                    title: `📋 مهمة جماعية جديدة`,
-                    body: `${creatorName} أضافك لمهمة: ${title}`,
-                    url: `/tasks/${task.id}`,
-                    data: { taskId: task.id, type: "task" }
-                  })
-                })
-              } catch (pushErr) {
-                console.error("Failed to send push notification for new task:", pushErr)
-              }
-            })
-          )
-        } catch (pushErrOuter) {
-          console.error("Failed to send push notifications for new task:", pushErrOuter)
+        // إرسال إشعار Push
+        const siteUrl = resolveSiteUrl(request)
+        const payload = {
+          title: `📋 مهمة جماعية جديدة`,
+          body: `${creatorName} أضافك لمهمة: ${title}`,
+          url: `/tasks/${task.id}`,
+          data: { taskId: task.id, type: "task" }
         }
+
+        // استدعاء مسار الإشعارات لإرسال Push
+        await Promise.all(
+          targetMembers.map(async (uid: string) => {
+            try {
+              const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+              await fetch(targetUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: uid, ...payload })
+              })
+            } catch (e) {
+              console.error("Failed to send task notification", e)
+            }
+          })
+        )
       }
     }
 
