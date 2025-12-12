@@ -9,7 +9,6 @@ import { useAuth } from "@/contexts/auth-context"
 const navItems = [
   { href: "/dashboard", label: "الرئيسية", icon: HomeIcon },
   { href: "/chat", label: "المحادثات", icon: MessageSquareIcon },
-  { href: "/notifications", label: "الإشعارات", icon: BellIcon },
   { href: "/reminders", label: "التنبيهات", icon: CalendarIcon },
   { href: "/tasks", label: "المهام", icon: ListTodoIcon },
   { href: "/contacts", label: "جهات الاتصال", icon: UsersIcon },
