@@ -4,7 +4,6 @@ import { useState, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { LanguageToggle } from "@/components/language-toggle"
 import { useLanguage } from "@/contexts/language-context"
 import { 
   SendIcon, 
@@ -258,7 +257,6 @@ export default function LandingPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageToggle />
             <Link href="/login">
               <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-2 rounded-full shadow-lg shadow-emerald-500/25 transition-all hover:scale-105">
                 {content.startFree}

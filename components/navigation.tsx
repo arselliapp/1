@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon, MessageSquareIcon, BellIcon, CalendarIcon, ListTodoIcon } from "@/components/icons"
 import { useAuth } from "@/contexts/auth-context"
-import { LanguageToggle } from "@/components/language-toggle"
 import { useLanguage } from "@/contexts/language-context"
 
 
@@ -49,7 +48,6 @@ export function Navigation() {
           </div>
           <span className="text-xl font-bold text-foreground">{language === "ar" ? "ارسل لي" : "Arselli"}</span>
         </div>
-        <LanguageToggle />
       </div>
 
       {/* Navigation Items */}
