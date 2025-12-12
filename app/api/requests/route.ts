@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         user_id: recipient_id,
         title: `${typeInfo.emoji} ${senderName} ${typeInfo.title}`,
         body: message.length > 80 ? message.substring(0, 80) + "..." : message,
-        type: "reminder",
+        type: "request", // استخدام "request" لأن constraint يسمح به
         url: "/reminders?tab=pending",
         data: serializeNotificationData(requestNotificationData),
         is_read: false,

@@ -138,7 +138,7 @@ export async function POST(
           user_id: m.user_id,
           title: `✅ تم إنجاز مهمة`,
           body: `${completerName} أنجز: ${item.title}`,
-          type: "task_update",
+          type: "system", // استخدام "system" بدلاً من "task_update" لتتوافق مع constraint
           url: `/tasks/${taskId}`,
           data: serializeNotificationData(notifData),
           is_read: false
@@ -257,7 +257,7 @@ export async function POST(
         user_id: m.user_id,
         title: `🎉 مبروك! تم إنجاز المهمة`,
         body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
-        type: "task_completed",
+        type: "system", // استخدام "system" بدلاً من "task_completed" لتتوافق مع constraint
         url: `/tasks/${taskId}`,
         data: serializeNotificationData(celebrationData),
         is_read: false

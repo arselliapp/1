@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
       user_id: recipient_id,
       title: `${typeInfo.emoji} ${typeInfo.label} من ${senderName}`,
       body: title,
-      type: "reminder",
+      type: "system", // استخدام "system" بدلاً من "reminder" لتتوافق مع constraint
       url: "/reminders",
       data: serializeNotificationData(reminderNotificationData),
       is_read: false
@@ -369,7 +369,7 @@ export async function PATCH(request: NextRequest) {
         ? `✅ ${recipientName} قبل دعوتك`
         : `❌ ${recipientName} اعتذر عن دعوتك`,
       body: reminder.title,
-      type: "reminder_response",
+      type: "system", // استخدام "system" بدلاً من "reminder_response" لتتوافق مع constraint
       url: "/reminders?tab=sent",
       data: serializeNotificationData(responseNotificationData),
       is_read: false

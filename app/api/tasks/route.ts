@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
         user_id,
         title: `📋 مهمة جماعية جديدة`,
         body: `${creatorName} أضافك لمهمة: ${title}`,
-        type: "task",
+        type: "system", // استخدام "system" بدلاً من "task" لتتوافق مع constraint
         url: `/tasks/${task.id}`,
         data: serializeNotificationData(taskNotificationData),
         is_read: false

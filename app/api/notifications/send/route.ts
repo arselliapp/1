@@ -139,11 +139,30 @@ export async function POST(request: Request) {
       const notificationData = data || {}
       console.log("[notifications/send] Notification data to serialize:", notificationData)
       
+      // تحديد نوع الإشعار بناءً على data.type مع fallback إلى القيم المسموحة
+      let notificationType = "system" // القيمة الافتراضية
+      if (data?.type) {
+        // تحويل الأنواع غير المسموحة إلى قيم مسموحة
+        const typeMap: Record<string, string> = {
+          "task": "system",
+          "task_deleted": "system",
+          "task_update": "system",
+          "task_completed": "system",
+          "reminder": "system",
+          "reminder_response": "system",
+          "request": "request",
+          "message": "message",
+          "contact": "contact",
+          "system": "system"
+        }
+        notificationType = typeMap[data.type] || "system"
+      }
+      
       const insertData = {
         user_id: userId,
         title: title || "إشعار جديد",
         body: body || "لديك إشعار جديد",
-        type: data?.type || "general",
+        type: notificationType, // استخدام نوع مسموح فقط
         data: serializeNotificationData(notificationData),
         url: url || defaultUrl,
         is_read: false,

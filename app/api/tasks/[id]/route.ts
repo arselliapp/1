@@ -83,12 +83,12 @@ export async function DELETE(
       console.log("[tasks/[id]/route] Creating delete notifications for members:", otherMembers.length)
       console.log("[tasks/[id]/route] Delete notification data:", deleteNotificationData)
 
-      // حفظ إشعار في قاعدة البيانات
+      // حفظ إشعار في قاعدة البيانات (استخدام "system" لأن constraint يسمح فقط بـ request, message, contact, system)
       const notifications = otherMembers.map(uid => ({
         user_id: uid,
         title: "🗑️ تم حذف مهمة",
         body: `قام المنشئ بحذف المهمة: ${task.title}`,
-        type: "task_deleted",
+        type: "system", // استخدام "system" بدلاً من "task_deleted" لتتوافق مع constraint
         url: "/tasks",
         data: serializeNotificationData(deleteNotificationData)
       }))

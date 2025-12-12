@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
             user_id: originalRequest.sender_id,
             title: `💬 رد جديد من ${responderName}`,
             body: `تم الرد على طلبك - اضغط لعرض الرد`,
-            type: "reminder",
+            type: "request", // استخدام "request" لأن constraint يسمح به
             url: "/reminders?tab=sent",
             data: {
                 requestId: request_id,
