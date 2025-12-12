@@ -5,36 +5,51 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { HomeIcon, UsersIcon, SendIcon, InboxIcon, SettingsIcon, LogOutIcon, ShieldIcon, MessageSquareIcon, BellIcon, CalendarIcon, ListTodoIcon } from "@/components/icons"
 import { useAuth } from "@/contexts/auth-context"
+import { LanguageToggle } from "@/components/language-toggle"
+import { useLanguage } from "@/contexts/language-context"
 
-const navItems = [
-  { href: "/dashboard", label: "الرئيسية", icon: HomeIcon },
-  { href: "/chat", label: "المحادثات", icon: MessageSquareIcon },
-  { href: "/reminders", label: "التنبيهات", icon: CalendarIcon },
-  { href: "/tasks", label: "المهام", icon: ListTodoIcon },
-  { href: "/contacts", label: "جهات الاتصال", icon: UsersIcon },
-]
-
-const adminNavItems = [
-  { href: "/admin", label: "لوحة التحكم", icon: ShieldIcon },
-]
 
 export function Navigation() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
+  const { language } = useLanguage()
 
   const avatarUrl = user?.user_metadata?.avatar_url
-  const initials = user?.email?.charAt(0).toUpperCase() || "م"
+  const initials = user?.email?.charAt(0).toUpperCase() || (language === "ar" ? "م" : "U")
   const displayName =
-    user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "مستخدم"
+    user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || (language === "ar" ? "مستخدم" : "User")
+  
+  const navItems = language === "ar" ? [
+    { href: "/dashboard", label: "الرئيسية", icon: HomeIcon },
+    { href: "/chat", label: "المحادثات", icon: MessageSquareIcon },
+    { href: "/reminders", label: "التنبيهات", icon: CalendarIcon },
+    { href: "/tasks", label: "المهام", icon: ListTodoIcon },
+    { href: "/contacts", label: "جهات الاتصال", icon: UsersIcon },
+  ] : [
+    { href: "/dashboard", label: "Home", icon: HomeIcon },
+    { href: "/chat", label: "Chat", icon: MessageSquareIcon },
+    { href: "/reminders", label: "Reminders", icon: CalendarIcon },
+    { href: "/tasks", label: "Tasks", icon: ListTodoIcon },
+    { href: "/contacts", label: "Contacts", icon: UsersIcon },
+  ]
+
+  const adminNavItems = language === "ar" ? [
+    { href: "/admin", label: "لوحة التحكم", icon: ShieldIcon },
+  ] : [
+    { href: "/admin", label: "Admin", icon: ShieldIcon },
+  ]
 
   return (
     <nav className="fixed bottom-0 right-0 left-0 md:top-0 md:right-0 md:bottom-0 md:left-auto md:w-64 bg-card border-t md:border-t-0 md:border-l border-border z-50">
       {/* Desktop Header */}
-      <div className="hidden md:flex items-center gap-3 p-6 border-b border-border">
-        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-          <SendIcon className="w-5 h-5 text-white" />
+      <div className="hidden md:flex items-center justify-between gap-3 p-6 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+            <SendIcon className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-xl font-bold text-foreground">{language === "ar" ? "ارسل لي" : "Arselli"}</span>
         </div>
-        <span className="text-xl font-bold text-foreground">ارسل لي</span>
+        <LanguageToggle />
       </div>
 
       {/* Navigation Items */}
@@ -97,6 +112,15 @@ export function Navigation() {
             <LogOutIcon className="w-4 h-4" />
           </button>
         </div>
+        {/* Language Toggle - Mobile */}
+        <div className="md:hidden flex justify-center mt-2">
+          <LanguageToggle />
+        </div>
+      </div>
+      
+      {/* Language Toggle - Mobile Bottom */}
+      <div className="md:hidden flex justify-center p-2 border-t border-border">
+        <LanguageToggle />
       </div>
     </nav>
   )
