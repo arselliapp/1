@@ -381,6 +381,8 @@ export const translations = {
     noChanges: "No changes to save.",
     phoneRequiredError: "Phone number is required to complete registration.",
     invalidPhone: "Please enter a valid phone number (e.g., 05xxxxxxxx)",
+    phoneNumber: "Phone Number",
+    phoneNumberPlaceholder: "e.g., 0555123456",
     imageError: "Please select a valid image",
     imageSizeError: "Image size must be less than 2MB",
     uploadError: "Error uploading image",
