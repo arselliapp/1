@@ -8,6 +8,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+function resolveSiteUrl(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  const host = request.headers.get("host")
+  if (host) {
+    const protocol = host.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  }
+
+  return ""
+}
+
 // أنواع التنبيهات
 const REMINDER_TYPES = {
   wedding: { label: "دعوة زواج", emoji: "💍" },
@@ -210,6 +228,25 @@ export async function POST(request: NextRequest) {
       data: { reminderId: reminder.id, reminderType: reminder_type },
       is_read: false
     })
+
+    // إرسال Push Notification فوري
+    try {
+      const siteUrl = resolveSiteUrl(request)
+      const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+      await fetch(targetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: recipient_id,
+          title: `${typeInfo.emoji} ${typeInfo.label} من ${senderName}`,
+          body: title,
+          url: "/reminders",
+          data: { reminderId: reminder.id, reminderType: reminder_type, type: "reminder" }
+        })
+      })
+    } catch (pushErr) {
+      console.error("Failed to send push reminder:", pushErr)
+    }
 
     return NextResponse.json({ reminder })
   } catch (err) {
