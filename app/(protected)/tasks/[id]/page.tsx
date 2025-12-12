@@ -12,6 +12,8 @@ import { ArrowRightIcon, UsersIcon, CheckCircleIcon, CalendarIcon } from "@/comp
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface TaskItem {
   id: string
@@ -51,6 +53,8 @@ export default function TaskDetailPage() {
   const taskId = params?.id as string
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
 
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
@@ -126,14 +130,14 @@ export default function TaskDetailPage() {
         if (data.task_completed) {
           setShowCelebration(true)
           showToast({
-            title: "🎉 مبروك!",
-            message: "تم إنجاز المهمة بالكامل",
+            title: `🎉 ${t.congratulations}`,
+            message: t.taskCompleted,
             type: "success"
           })
         } else {
           showToast({
-            title: currentlyCompleted ? "↩️ تم التراجع" : "✅ تم الإنجاز",
-            message: currentlyCompleted ? "تم إلغاء التنفيذ" : "تم تحديد المهمة كمنفذة",
+            title: currentlyCompleted ? `↩️ ${t.undone}` : `✅ ${t.completed}`,
+            message: currentlyCompleted ? t.undoneDesc : t.completedDesc,
             type: "success"
           })
         }
@@ -142,7 +146,7 @@ export default function TaskDetailPage() {
       }
     } catch (err) {
       console.error("Error:", err)
-      showToast({ title: "❌ خطأ", message: "حدث خطأ", type: "error" })
+      showToast({ title: `❌ ${t.error}`, message: t.error, type: "error" })
     } finally {
       setProcessingItem(null)
     }
@@ -158,7 +162,7 @@ export default function TaskDetailPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("ar-SA", {
+    return new Date(dateString).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -177,16 +181,16 @@ export default function TaskDetailPage() {
   if (!task) {
     return (
       <div className="text-center py-12">
-        <p className="text-lg text-muted-foreground">المهمة غير موجودة</p>
+        <p className="text-lg text-muted-foreground">{t.taskNotFound}</p>
         <Button className="mt-4" onClick={() => router.push("/tasks")}>
-          العودة للمهام
+          {t.backToTasks}
         </Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* شاشة الاحتفال */}
       {showCelebration && (
         <div 
@@ -195,8 +199,8 @@ export default function TaskDetailPage() {
         >
           <div className="text-center animate-in zoom-in-50 duration-500">
             <div className="text-9xl mb-6 animate-bounce">🎉</div>
-            <h1 className="text-4xl font-bold text-white mb-4">مبروك!</h1>
-            <p className="text-xl text-white/80 mb-2">تم إنجاز المهمة بنجاح</p>
+            <h1 className="text-4xl font-bold text-white mb-4">{t.congratulations}</h1>
+            <p className="text-xl text-white/80 mb-2">{t.taskCompleted}</p>
             <p className="text-lg text-primary font-semibold">{task.title}</p>
             <div className="mt-8 flex gap-4 justify-center">
               <Button 
@@ -206,14 +210,14 @@ export default function TaskDetailPage() {
                   router.push("/tasks")
                 }}
               >
-                العودة للمهام
+                {t.backToTasks}
               </Button>
               <Button 
                 size="lg" 
                 variant="outline"
                 onClick={() => setShowCelebration(false)}
               >
-                إغلاق
+                {t.close}
               </Button>
             </div>
           </div>
@@ -244,14 +248,14 @@ export default function TaskDetailPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               {task.status === "completed" ? (
-                <Badge className="bg-green-500">✅ مكتملة</Badge>
+                <Badge className="bg-green-500">✅ {t.completed}</Badge>
               ) : (
-                <Badge className="bg-amber-500">🔄 نشطة</Badge>
+                <Badge className="bg-amber-500">🔄 {t.active}</Badge>
               )}
               {task.is_group_task && (
                 <Badge variant="outline">
-                  <UsersIcon className="ml-1 h-3 w-3" />
-                  جماعية ({task.members.length} مشارك)
+                  <UsersIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-3 w-3`} />
+                  {language === "ar" ? `جماعية (${task.members.length} مشارك)` : `Group (${task.members.length} members)`}
                 </Badge>
               )}
             </div>
@@ -272,26 +276,26 @@ export default function TaskDetailPage() {
             )}
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>{task.completed_items} من {task.total_items} مهام مكتملة</span>
+            <span>{language === "ar" ? `${task.completed_items} من ${task.total_items} مهام مكتملة` : `${task.completed_items} of ${task.total_items} tasks completed`}</span>
             {task.is_group_task && task.status === "active" && (
               <span className="flex items-center gap-1 text-xs text-primary">
                 <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                تحديث تلقائي
+                {language === "ar" ? "تحديث تلقائي" : "Auto-update"}
               </span>
             )}
           </div>
           {task.is_group_task && (
             <div className="mt-3 p-2 bg-muted/50 rounded-lg flex items-center gap-2 text-sm">
-              <span>نوع الإنجاز:</span>
+              <span>{language === "ar" ? "نوع الإنجاز:" : "Completion type:"}</span>
               <Badge variant="secondary">
-                {task.completion_type === "any" ? "👤 أي شخص يكفي" : "👥 الجميع مطلوب"}
+                {task.completion_type === "any" ? `👤 ${t.anyoneDesc}` : `👥 ${t.everyoneDesc}`}
               </Badge>
             </div>
           )}
           {task.due_date && (
             <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
               <CalendarIcon className="h-4 w-4" />
-              الاستحقاق: {formatDate(task.due_date)}
+              {language === "ar" ? "الاستحقاق:" : "Due:"} {formatDate(task.due_date)}
             </p>
           )}
         </CardContent>
@@ -303,7 +307,7 @@ export default function TaskDetailPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <UsersIcon className="h-5 w-5" />
-              المشاركون ({task.members.length})
+              {language === "ar" ? `المشاركون (${task.members.length})` : `Members (${task.members.length})`}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -316,7 +320,7 @@ export default function TaskDetailPage() {
                   </Avatar>
                   <span className="text-sm font-medium">{member.name}</span>
                   {member.role === "owner" && (
-                    <Badge variant="secondary" className="text-xs">المنشئ</Badge>
+                    <Badge variant="secondary" className="text-xs">{language === "ar" ? "المنشئ" : "Creator"}</Badge>
                   )}
                 </div>
               ))}
@@ -328,7 +332,7 @@ export default function TaskDetailPage() {
       {/* Task Items */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">✅ المهام الفرعية</CardTitle>
+          <CardTitle className="text-lg">✅ {t.subTasks}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {task.items.map((item, index) => {

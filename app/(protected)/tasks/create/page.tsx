@@ -14,6 +14,8 @@ import { ArrowRightIcon, PlusIcon, XCircleIcon, UsersIcon, SearchIcon } from "@/
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface Contact {
   id: string
@@ -28,16 +30,18 @@ interface TaskItem {
   assigned_to?: string
 }
 
-const TASK_TYPES = [
-  { id: "daily", label: "يومية", emoji: "📅", description: "مهام تتكرر يومياً" },
-  { id: "weekly", label: "أسبوعية", emoji: "📆", description: "مهام تتكرر أسبوعياً" },
-  { id: "monthly", label: "شهرية", emoji: "🗓️", description: "مهام تتكرر شهرياً" },
-]
-
 export default function CreateTaskPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
+  
+  const TASK_TYPES = [
+    { id: "daily", label: t.daily, emoji: "📅", description: language === "ar" ? "مهام تتكرر يومياً" : "Tasks that repeat daily" },
+    { id: "weekly", label: t.weekly, emoji: "📆", description: language === "ar" ? "مهام تتكرر أسبوعياً" : "Tasks that repeat weekly" },
+    { id: "monthly", label: t.monthly, emoji: "🗓️", description: language === "ar" ? "مهام تتكرر شهرياً" : "Tasks that repeat monthly" },
+  ]
 
   const [loading, setLoading] = useState(false)
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -76,7 +80,7 @@ export default function CreateTaskPage() {
           if (userData && userData.length > 0) {
             contactsList.push({
               id,
-              name: userData[0].full_name || "مستخدم",
+              name: userData[0].full_name || (language === "ar" ? "مستخدم" : "User"),
               avatar: userData[0].avatar_url,
               phone: userData[0].phone_number
             })
@@ -116,13 +120,13 @@ export default function CreateTaskPage() {
     e.preventDefault()
 
     if (!title.trim()) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى إدخال عنوان المهمة", type: "error" })
+      showToast({ title: `⚠️ ${t.warning}`, message: t.enterTaskTitle, type: "error" })
       return
     }
 
     const validItems = items.filter(item => item.title.trim())
     if (validItems.length === 0) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى إضافة مهمة واحدة على الأقل", type: "error" })
+      showToast({ title: `⚠️ ${t.warning}`, message: t.addAtLeastOne, type: "error" })
       return
     }
 
@@ -131,7 +135,7 @@ export default function CreateTaskPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        showToast({ title: "⚠️ تنبيه", message: "يجب تسجيل الدخول", type: "error" })
+        showToast({ title: `⚠️ ${t.warning}`, message: t.loginRequired, type: "error" })
         return
       }
 
@@ -156,8 +160,8 @@ export default function CreateTaskPage() {
       if (response.ok) {
         const data = await response.json()
         showToast({
-          title: "✅ تم الإنشاء",
-          message: "تم إنشاء المهمة بنجاح",
+          title: `✅ ${t.success}`,
+          message: t.taskCreated,
           type: "success"
         })
         router.push(`/tasks/${data.task.id}`)
@@ -165,17 +169,17 @@ export default function CreateTaskPage() {
         const data = await response.json()
         if (data.details?.includes("tasks_schema.sql")) {
           showToast({ 
-            title: "⚠️ إعداد مطلوب", 
-            message: "يجب تشغيل SQL في Supabase لتفعيل نظام المهام", 
+            title: `⚠️ ${t.warning}`, 
+            message: language === "ar" ? "يجب تشغيل SQL في Supabase لتفعيل نظام المهام" : "SQL must be run in Supabase to enable the tasks system", 
             type: "error" 
           })
         } else {
-          showToast({ title: "❌ خطأ", message: data.error || "حدث خطأ", type: "error" })
+          showToast({ title: `❌ ${t.error}`, message: data.error || t.error, type: "error" })
         }
       }
     } catch (err) {
       console.error("Error:", err)
-      showToast({ title: "❌ خطأ", message: "حدث خطأ غير متوقع", type: "error" })
+      showToast({ title: `❌ ${t.error}`, message: t.unexpectedError, type: "error" })
     } finally {
       setLoading(false)
     }
@@ -187,15 +191,15 @@ export default function CreateTaskPage() {
   )
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowRightIcon className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">📝 مهمة جديدة</h1>
-          <p className="text-muted-foreground text-sm">أنشئ مهمة فردية أو جماعية</p>
+          <h1 className="text-2xl font-bold">📝 {t.newTaskTitle}</h1>
+          <p className="text-muted-foreground text-sm">{t.newTaskDesc}</p>
         </div>
       </div>
 
@@ -203,7 +207,7 @@ export default function CreateTaskPage() {
         {/* نوع المهمة */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">📊 نوع المهمة</CardTitle>
+            <CardTitle className="text-lg">📊 {t.taskType}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3">
@@ -228,14 +232,14 @@ export default function CreateTaskPage() {
         {/* معلومات المهمة */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">📝 معلومات المهمة</CardTitle>
+            <CardTitle className="text-lg">📝 {t.taskInfo}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="title">عنوان المهمة *</Label>
+              <Label htmlFor="title">{t.taskTitle}</Label>
               <Input
                 id="title"
-                placeholder="مثال: تنظيف المنزل"
+                placeholder={t.taskExample}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -243,10 +247,10 @@ export default function CreateTaskPage() {
             </div>
 
             <div>
-              <Label htmlFor="description">الوصف (اختياري)</Label>
+              <Label htmlFor="description">{t.taskDescription}</Label>
               <Textarea
                 id="description"
-                placeholder="تفاصيل إضافية عن المهمة..."
+                placeholder={t.taskDescriptionPlaceholder}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
@@ -254,7 +258,7 @@ export default function CreateTaskPage() {
             </div>
 
             <div>
-              <Label htmlFor="dueDate">تاريخ الاستحقاق (اختياري)</Label>
+              <Label htmlFor="dueDate">{t.dueDate}</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -270,8 +274,8 @@ export default function CreateTaskPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
-              <span>✅ المهام الفرعية</span>
-              <Badge variant="secondary">{items.filter(i => i.title.trim()).length} مهمة</Badge>
+              <span>✅ {t.subTasks}</span>
+              <Badge variant="secondary">{items.filter(i => i.title.trim()).length} {t.taskItems}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -279,7 +283,7 @@ export default function CreateTaskPage() {
               <div key={item.id} className="flex items-center gap-2">
                 <span className="text-muted-foreground w-6">{index + 1}.</span>
                 <Input
-                  placeholder="أدخل المهمة..."
+                  placeholder={t.enterTask}
                   value={item.title}
                   onChange={(e) => updateItem(item.id, e.target.value)}
                 />
@@ -296,8 +300,8 @@ export default function CreateTaskPage() {
               </div>
             ))}
             <Button type="button" variant="outline" onClick={addItem} className="w-full">
-              <PlusIcon className="ml-1 h-4 w-4" />
-              إضافة مهمة فرعية
+              <PlusIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+              {t.addSubTask}
             </Button>
           </CardContent>
         </Card>
@@ -307,7 +311,7 @@ export default function CreateTaskPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <UsersIcon className="h-5 w-5" />
-              مهمة جماعية
+              {t.groupTask}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -317,9 +321,9 @@ export default function CreateTaskPage() {
                 onCheckedChange={(checked) => setIsGroupTask(!!checked)}
               />
               <div>
-                <p className="font-medium">تفعيل المهمة الجماعية</p>
+                <p className="font-medium">{t.enableGroupTask}</p>
                 <p className="text-xs text-muted-foreground">
-                  شارك المهمة مع جهات اتصال أخرى
+                  {t.shareWithContacts}
                 </p>
               </div>
             </label>
@@ -328,7 +332,7 @@ export default function CreateTaskPage() {
               <>
                 {/* نوع الإنجاز */}
                 <div className="p-4 bg-muted/50 rounded-xl space-y-3">
-                  <p className="font-medium text-sm">🎯 نوع الإنجاز</p>
+                  <p className="font-medium text-sm">🎯 {t.completionType}</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div
                       className={`p-4 rounded-xl border-2 cursor-pointer transition-all text-center ${
@@ -339,9 +343,9 @@ export default function CreateTaskPage() {
                       onClick={() => setCompletionType("all")}
                     >
                       <span className="text-2xl block mb-1">👥</span>
-                      <p className="font-medium text-sm">الجميع</p>
+                      <p className="font-medium text-sm">{t.everyone}</p>
                       <p className="text-xs text-muted-foreground">
-                        يجب على كل المشاركين التنفيذ
+                        {t.everyoneDesc}
                       </p>
                     </div>
                     <div
@@ -353,9 +357,9 @@ export default function CreateTaskPage() {
                       onClick={() => setCompletionType("any")}
                     >
                       <span className="text-2xl block mb-1">👤</span>
-                      <p className="font-medium text-sm">أي شخص</p>
+                      <p className="font-medium text-sm">{t.anyone}</p>
                       <p className="text-xs text-muted-foreground">
-                        يكفي شخص واحد للتنفيذ
+                        {t.anyoneDesc}
                       </p>
                     </div>
                   </div>
@@ -388,19 +392,19 @@ export default function CreateTaskPage() {
 
                 {/* البحث واختيار المشاركين */}
                 <div className="relative">
-                  <SearchIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <SearchIcon className={`absolute ${language === "ar" ? "right-3" : "left-3"} top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground`} />
                   <Input
-                    placeholder="بحث في جهات الاتصال..."
+                    placeholder={t.searchContacts}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-10"
+                    className={language === "ar" ? "pr-10" : "pl-10"}
                   />
                 </div>
 
                 <div className="max-h-48 overflow-y-auto space-y-2">
                   {filteredContacts.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4 text-sm">
-                      لا توجد جهات اتصال
+                      {t.noContacts}
                     </p>
                   ) : (
                     filteredContacts.map(contact => {
@@ -446,8 +450,8 @@ export default function CreateTaskPage() {
             <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <PlusIcon className="ml-2 h-5 w-5" />
-              إنشاء المهمة
+              <PlusIcon className={`${language === "ar" ? "ml-2" : "mr-2"} h-5 w-5`} />
+              {t.createTask}
             </>
           )}
         </Button>

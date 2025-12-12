@@ -11,6 +11,8 @@ import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 // الرقم السري للوحة التحكم
 const ADMIN_PIN = "1486"
@@ -43,6 +45,8 @@ export default function AdminPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,7 +85,7 @@ export default function AdminPage() {
       sessionStorage.setItem("admin_authenticated", "true")
       setPinError("")
     } else {
-      setPinError("الرقم السري غير صحيح")
+      setPinError(t.incorrectPin)
       setPin("")
     }
   }
@@ -156,8 +160,8 @@ export default function AdminPage() {
   const handleDeleteContact = async (contactId: string) => {
     setConfirmDialog({
       show: true,
-      title: "حذف جهة الاتصال",
-      message: "هل أنت متأكد من حذف جهة الاتصال هذه؟",
+      title: t.deleteContact,
+      message: t.confirmDeleteContact,
       type: "contact",
       onConfirm: async () => {
         setConfirmDialog(null)
@@ -173,14 +177,14 @@ export default function AdminPage() {
           if (data.error) {
             console.error("Error deleting contact:", data.error)
             showToast({
-              title: "❌ خطأ",
-              message: "حدث خطأ أثناء حذف جهة الاتصال",
+              title: `❌ ${t.error}`,
+              message: language === "ar" ? "حدث خطأ أثناء حذف جهة الاتصال" : "Error deleting contact",
               type: "error"
             })
           } else {
             showToast({
-              title: "✅ تم الحذف",
-              message: "تم حذف جهة الاتصال بنجاح",
+              title: `✅ ${t.success}`,
+              message: t.contactDeleted,
               type: "success"
             })
             loadData()
@@ -188,8 +192,8 @@ export default function AdminPage() {
         } catch (err) {
           console.error("Error:", err)
           showToast({
-            title: "❌ خطأ",
-            message: "حدث خطأ غير متوقع",
+            title: `❌ ${t.error}`,
+            message: t.unexpectedError,
             type: "error"
           })
         }
@@ -200,8 +204,8 @@ export default function AdminPage() {
   const handleDeleteUser = async (userId: string) => {
     setConfirmDialog({
       show: true,
-      title: "⚠️ تحذير: حذف الحساب",
-      message: "سيتم حذف الحساب بالكامل وجميع بياناته (الإضافات والطلبات). هل أنت متأكد؟",
+      title: `⚠️ ${t.warning}: ${t.deleteUser}`,
+      message: language === "ar" ? "سيتم حذف الحساب بالكامل وجميع بياناته (الإضافات والطلبات). هل أنت متأكد؟" : "The account and all its data (contacts and requests) will be deleted. Are you sure?",
       type: "user",
       onConfirm: async () => {
         setConfirmDialog(null)
@@ -217,14 +221,14 @@ export default function AdminPage() {
           if (data.error) {
             console.error("Error deleting user:", data.error)
             showToast({
-              title: "❌ خطأ",
-              message: "حدث خطأ أثناء حذف المستخدم",
+              title: `❌ ${t.error}`,
+              message: language === "ar" ? "حدث خطأ أثناء حذف المستخدم" : "Error deleting user",
               type: "error"
             })
           } else {
             showToast({
-              title: "✅ تم الحذف",
-              message: "تم حذف المستخدم بنجاح",
+              title: `✅ ${t.success}`,
+              message: language === "ar" ? "تم حذف المستخدم بنجاح" : "User deleted successfully",
               type: "success"
             })
             loadData()
@@ -232,8 +236,8 @@ export default function AdminPage() {
         } catch (err) {
           console.error("Error:", err)
           showToast({
-            title: "❌ خطأ",
-            message: "حدث خطأ غير متوقع",
+            title: `❌ ${t.error}`,
+            message: t.unexpectedError,
             type: "error"
           })
         }
@@ -243,7 +247,7 @@ export default function AdminPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleString('ar-SA', {
+    return date.toLocaleString(language === "ar" ? 'ar-SA' : 'en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -254,9 +258,9 @@ export default function AdminPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-      accepted: { label: "مقبول", variant: "default" },
-      pending: { label: "معلق", variant: "secondary" },
-      blocked: { label: "محظور", variant: "destructive" }
+      accepted: { label: language === "ar" ? "مقبول" : "Accepted", variant: "default" },
+      pending: { label: language === "ar" ? "معلق" : "Pending", variant: "secondary" },
+      blocked: { label: language === "ar" ? "محظور" : "Blocked", variant: "destructive" }
     }
     const s = statusMap[status] || { label: status, variant: "secondary" }
     return <Badge variant={s.variant} className="text-xs">{s.label}</Badge>
@@ -277,14 +281,14 @@ export default function AdminPage() {
               className="flex-1"
               onClick={confirmDialog.onConfirm}
             >
-              تأكيد الحذف
+              {t.deleteConfirm}
             </Button>
             <Button
               variant="outline"
               className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
               onClick={() => setConfirmDialog(null)}
             >
-              إلغاء
+              {t.deleteCancel}
             </Button>
           </div>
         </div>
@@ -295,20 +299,20 @@ export default function AdminPage() {
   // شاشة إدخال الرقم السري
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
         <Card className="w-full max-w-sm bg-slate-800/50 border-slate-700">
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-500 to-orange-600 rounded-full flex items-center justify-center mb-4">
               <ShieldIcon className="w-8 h-8 text-white" />
             </div>
-            <CardTitle className="text-xl text-white">لوحة التحكم</CardTitle>
-            <p className="text-slate-400 text-sm">أدخل الرقم السري للدخول</p>
+            <CardTitle className="text-xl text-white">{t.adminPanel}</CardTitle>
+            <p className="text-slate-400 text-sm">{t.enterPin}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePinSubmit} className="space-y-4">
               <Input
                 type="password"
-                placeholder="الرقم السري"
+                placeholder={t.pin}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 className="bg-slate-700/50 border-slate-600 text-white text-center text-2xl tracking-widest"
@@ -323,7 +327,7 @@ export default function AdminPage() {
                 className="w-full bg-red-600 hover:bg-red-700"
                 disabled={pin.length !== 4}
               >
-                دخول
+                {t.enter}
               </Button>
               <Button
                 type="button"
@@ -331,7 +335,7 @@ export default function AdminPage() {
                 className="w-full text-slate-400"
                 onClick={() => router.push("/dashboard")}
               >
-                العودة
+                {t.back}
               </Button>
             </form>
           </CardContent>
@@ -345,26 +349,26 @@ export default function AdminPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">جاري التحميل...</p>
+          <p className="mt-4 text-muted-foreground">{t.loading}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className={`container mx-auto p-6 max-w-7xl ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       <ConfirmDialog />
       
       <div className="flex items-center gap-3 mb-6">
         <ShieldIcon className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">لوحة التحكم</h1>
+        <h1 className="text-3xl font-bold">{t.adminPanel}</h1>
       </div>
 
       {/* الإحصائيات */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي الإضافات</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t.totalContacts}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalContacts}</div>
@@ -372,7 +376,7 @@ export default function AdminPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي المستخدمين</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t.totalUsers}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalUsers}</div>
@@ -380,7 +384,7 @@ export default function AdminPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي الطلبات</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t.totalRequests}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalRequests}</div>
@@ -391,7 +395,7 @@ export default function AdminPage() {
       {/* قائمة الإضافات (جهات الاتصال) */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>الإضافات ({contacts.length})</CardTitle>
+          <CardTitle>{language === "ar" ? `الإضافات (${contacts.length})` : `Contacts (${contacts.length})`}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -399,7 +403,7 @@ export default function AdminPage() {
               <div key={c.id} className="p-4 border rounded-lg">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">المالك:</h3>
+                    <h3 className="font-semibold">{language === "ar" ? "المالك:" : "Owner:"}</h3>
                     <span>{c.owner_name}</span>
                     <Badge variant="outline" className="text-xs">{c.owner_email}</Badge>
                   </div>
@@ -416,7 +420,7 @@ export default function AdminPage() {
                     </Avatar>
                     <div className="flex-1">
                       <h3 className="font-bold text-lg">
-                        {c.contact_name && c.contact_name !== "مستخدم" ? c.contact_name : c.contact_email.split('@')[0]}
+                        {c.contact_name && c.contact_name !== (language === "ar" ? "مستخدم" : "User") ? c.contact_name : c.contact_email.split('@')[0]}
                       </h3>
                       <div className="flex flex-col gap-1 mt-1">
                         <p className="text-sm text-muted-foreground">📧 {c.contact_email}</p>
@@ -425,7 +429,7 @@ export default function AdminPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">
-                        تاريخ الإضافة: {formatDate(c.created_at)}
+                        {language === "ar" ? "تاريخ الإضافة:" : "Added:"} {formatDate(c.created_at)}
                       </p>
                     </div>
                   </div>
@@ -434,15 +438,15 @@ export default function AdminPage() {
                     size="sm"
                     onClick={() => handleDeleteContact(c.id)}
                   >
-                    <TrashIcon className="h-4 w-4 ml-2" />
-                    حذف
+                    <TrashIcon className={`h-4 w-4 ${language === "ar" ? "ml-2" : "mr-2"}`} />
+                    {t.delete}
                   </Button>
                 </div>
               </div>
             ))}
             {contacts.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                لا توجد إضافات حالياً
+                {language === "ar" ? "لا توجد إضافات حالياً" : "No contacts currently"}
               </div>
             )}
           </div>
@@ -452,7 +456,7 @@ export default function AdminPage() {
       {/* قائمة المستخدمين */}
       <Card>
         <CardHeader>
-          <CardTitle>المستخدمون ({users.length})</CardTitle>
+          <CardTitle>{language === "ar" ? `المستخدمون (${users.length})` : `Users (${users.length})`}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -476,7 +480,7 @@ export default function AdminPage() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      تاريخ التسجيل: {formatDate(u.created_at)}
+                      {language === "ar" ? "تاريخ التسجيل:" : "Registered:"} {formatDate(u.created_at)}
                     </p>
                   </div>
                   <Button
@@ -484,15 +488,15 @@ export default function AdminPage() {
                     size="sm"
                     onClick={() => handleDeleteUser(u.id)}
                   >
-                    <TrashIcon className="h-4 w-4 ml-2" />
-                    حذف الحساب
+                    <TrashIcon className={`h-4 w-4 ${language === "ar" ? "ml-2" : "mr-2"}`} />
+                    {language === "ar" ? "حذف الحساب" : "Delete Account"}
                   </Button>
                 </div>
               </div>
             ))}
             {users.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                لا يوجد مستخدمون حالياً
+                {language === "ar" ? "لا يوجد مستخدمون حالياً" : "No users currently"}
               </div>
             )}
           </div>

@@ -12,15 +12,8 @@ import { SendIcon, ArrowRightIcon, SearchIcon } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
-
-// أنواع التنبيهات (بدون عيد ميلاد)
-const REMINDER_TYPES = [
-  { id: "wedding", label: "دعوة زواج", emoji: "💍", description: "دعوة لحضور حفل زواج", needsDetails: true },
-  { id: "meeting", label: "اجتماع", emoji: "📅", description: "موعد اجتماع أو لقاء", needsDetails: true },
-  { id: "callback", label: "رد على اتصال", emoji: "📞", description: "تذكير برد على مكالمة", needsDetails: false },
-  { id: "event", label: "مناسبة", emoji: "🎉", description: "دعوة لمناسبة عامة", needsDetails: true },
-  { id: "general", label: "تذكير عام", emoji: "⏰", description: "تذكير بموعد أو مهمة", needsDetails: true },
-]
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface Contact {
   id: string
@@ -35,6 +28,17 @@ export default function SendReminderPage() {
   const preselectedUserId = searchParams?.get("to")
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
+  
+  // أنواع التنبيهات (بدون عيد ميلاد)
+  const REMINDER_TYPES = [
+    { id: "wedding", label: t.weddingInvitation, emoji: "💍", description: t.weddingDesc, needsDetails: true },
+    { id: "meeting", label: t.meeting, emoji: "📅", description: t.meetingDesc, needsDetails: true },
+    { id: "callback", label: t.callbackReminder, emoji: "📞", description: t.callbackDesc, needsDetails: false },
+    { id: "event", label: t.event, emoji: "🎉", description: t.eventDesc, needsDetails: true },
+    { id: "general", label: t.generalReminder, emoji: "⏰", description: t.generalDesc, needsDetails: true },
+  ]
 
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,9 +68,9 @@ export default function SendReminderPage() {
   // تحديث العنوان تلقائياً عند اختيار نوع callback
   useEffect(() => {
     if (selectedType === "callback" && !title) {
-      setTitle("تذكير برد على اتصال")
+      setTitle(t.callbackTitle)
     }
-  }, [selectedType])
+  }, [selectedType, t])
 
   const loadContacts = async () => {
     try {
@@ -89,7 +93,7 @@ export default function SendReminderPage() {
           if (userData && userData.length > 0) {
             contactsList.push({
               id,
-              name: userData[0].full_name || "مستخدم",
+              name: userData[0].full_name || (language === "ar" ? "مستخدم" : "User"),
               avatar: userData[0].avatar_url,
               phone: userData[0].phone_number
             })
@@ -112,12 +116,12 @@ export default function SendReminderPage() {
     const needsDetails = typeInfo?.needsDetails !== false
 
     if (!selectedContact || !selectedType || !title) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى ملء الحقول المطلوبة", type: "error" })
+      showToast({ title: `⚠️ ${t.warning}`, message: t.fillRequired, type: "error" })
       return
     }
 
     if (needsDetails && (!eventDate || !eventTime)) {
-      showToast({ title: "⚠️ تنبيه", message: "يرجى تحديد التاريخ والوقت", type: "error" })
+      showToast({ title: `⚠️ ${t.warning}`, message: t.selectDateTime, type: "error" })
       return
     }
 
@@ -126,7 +130,7 @@ export default function SendReminderPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        showToast({ title: "⚠️ تنبيه", message: "يجب تسجيل الدخول", type: "error" })
+        showToast({ title: `⚠️ ${t.warning}`, message: t.loginRequired, type: "error" })
         return
       }
 
@@ -157,22 +161,22 @@ export default function SendReminderPage() {
 
       if (response.ok) {
         showToast({
-          title: "✅ تم الإرسال",
-          message: `تم إرسال التنبيه لـ ${selectedContact.name}`,
+          title: `✅ ${t.reminderSent}`,
+          message: t.reminderSentTo.replace("{name}", selectedContact.name),
           type: "success",
           action: {
-            label: "عرض التنبيهات",
+            label: t.viewReminders,
             onClick: () => router.push("/reminders?tab=sent")
           }
         })
         router.push("/reminders?tab=sent")
       } else {
         const data = await response.json()
-        showToast({ title: "❌ خطأ", message: data.error || "حدث خطأ", type: "error" })
+        showToast({ title: `❌ ${t.error}`, message: data.error || t.error, type: "error" })
       }
     } catch (err) {
       console.error("Error:", err)
-      showToast({ title: "❌ خطأ", message: "حدث خطأ غير متوقع", type: "error" })
+      showToast({ title: `❌ ${t.error}`, message: t.unexpectedError, type: "error" })
     } finally {
       setSending(false)
     }
@@ -196,15 +200,15 @@ export default function SendReminderPage() {
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowRightIcon className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">📤 إرسال تنبيه</h1>
-          <p className="text-muted-foreground text-sm">أرسل دعوة أو تذكير</p>
+          <h1 className="text-2xl font-bold">📤 {t.sendReminderTitle}</h1>
+          <p className="text-muted-foreground text-sm">{t.sendReminderDesc}</p>
         </div>
       </div>
 
@@ -212,7 +216,7 @@ export default function SendReminderPage() {
         {/* Step 1: Select Contact */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">👤 اختر المستلم</CardTitle>
+            <CardTitle className="text-lg">👤 {t.selectRecipient}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedContact ? (
@@ -228,23 +232,23 @@ export default function SendReminderPage() {
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedContact(null)}>
-                  تغيير
+                  {t.change}
                 </Button>
               </div>
             ) : (
               <>
                 <div className="relative">
-                  <SearchIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <SearchIcon className={`absolute ${language === "ar" ? "right-3" : "left-3"} top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground`} />
                   <Input
-                    placeholder="بحث في جهات الاتصال..."
+                    placeholder={t.searchContacts}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-10"
+                    className={language === "ar" ? "pr-10" : "pl-10"}
                   />
                 </div>
                 <div className="max-h-48 overflow-y-auto space-y-2">
                   {filteredContacts.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">لا توجد جهات اتصال</p>
+                    <p className="text-center text-muted-foreground py-4">{t.noContacts}</p>
                   ) : (
                     filteredContacts.map(contact => (
                       <div
@@ -272,7 +276,7 @@ export default function SendReminderPage() {
         {/* Step 2: Select Type */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">📋 نوع التنبيه</CardTitle>
+            <CardTitle className="text-lg">📋 {t.reminderType}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -288,8 +292,8 @@ export default function SendReminderPage() {
                     setSelectedType(type.id)
                     // تعيين عنوان افتراضي للاتصال
                     if (type.id === "callback") {
-                      setTitle("تذكير برد على اتصال")
-                    } else if (title === "تذكير برد على اتصال") {
+                      setTitle(t.callbackTitle)
+                    } else if (title === t.callbackTitle) {
                       setTitle("")
                     }
                   }}
@@ -305,14 +309,14 @@ export default function SendReminderPage() {
         {/* Step 3: Details (only if needed) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">📝 التفاصيل</CardTitle>
+            <CardTitle className="text-lg">📝 {t.details}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="title">العنوان *</Label>
+              <Label htmlFor="title">{t.title} *</Label>
               <Input
                 id="title"
-                placeholder={selectedType === "callback" ? "تذكير برد على اتصال" : "مثال: زواج أحمد"}
+                placeholder={selectedType === "callback" ? t.callbackTitle : `${t.example} ${t.weddingExample}`}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -324,11 +328,11 @@ export default function SendReminderPage() {
               <>
                 <div>
                   <Label htmlFor="description">
-                    {selectedType === "meeting" ? "الغرض منه (اختياري)" : "الوصف (اختياري)"}
+                    {selectedType === "meeting" ? t.purpose : `${t.description} (${t.close})`}
                   </Label>
                   <Textarea
                     id="description"
-                    placeholder={selectedType === "meeting" ? "ما هو الغرض من الاجتماع؟" : "تفاصيل إضافية..."}
+                    placeholder={selectedType === "meeting" ? t.purposePlaceholder : t.additionalDetails}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}
@@ -337,7 +341,7 @@ export default function SendReminderPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="date">التاريخ *</Label>
+                    <Label htmlFor="date">{t.date}</Label>
                     <Input
                       id="date"
                       type="date"
@@ -348,7 +352,7 @@ export default function SendReminderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="time">الوقت *</Label>
+                    <Label htmlFor="time">{t.time}</Label>
                     <Input
                       id="time"
                       type="time"
@@ -360,10 +364,10 @@ export default function SendReminderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="location">المكان (اختياري)</Label>
+                  <Label htmlFor="location">{t.place}</Label>
                   <Input
                     id="location"
-                    placeholder="مثال: قاعة النخيل - الرياض"
+                    placeholder={t.placePlaceholder}
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                   />
@@ -375,7 +379,7 @@ export default function SendReminderPage() {
             {selectedType === "callback" && (
               <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                 <p className="text-sm text-blue-600">
-                  📞 سيتم إرسال تذكير فوري للمستلم برد على اتصالك
+                  📞 {t.callbackMessage}
                 </p>
               </div>
             )}
@@ -392,8 +396,8 @@ export default function SendReminderPage() {
             <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <SendIcon className="ml-2 h-5 w-5" />
-              إرسال التنبيه
+              <SendIcon className={`${language === "ar" ? "ml-2" : "mr-2"} h-5 w-5`} />
+              {t.sendReminder}
             </>
           )}
         </Button>

@@ -173,7 +173,7 @@ export default function ChatRoomPage() {
           const presence = presenceData.presence?.[otherUserId]
           setOtherUser({
             id: otherUserId,
-            name: userData[0].full_name || "مستخدم",
+            name: userData[0].full_name || (language === "ar" ? "مستخدم" : "User"),
             avatar: userData[0].avatar_url,
             is_online: presence?.is_online || false,
             last_seen: presence?.last_seen
@@ -311,7 +311,7 @@ export default function ChatRoomPage() {
   }
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString("ar-SA", {
+    return new Date(dateString).toLocaleTimeString(language === "ar" ? "ar-SA" : "en-US", {
       hour: "2-digit",
       minute: "2-digit"
     })
@@ -324,11 +324,11 @@ export default function ChatRoomPage() {
     yesterday.setDate(yesterday.getDate() - 1)
 
     if (date.toDateString() === today.toDateString()) {
-      return "اليوم"
+      return language === "ar" ? "اليوم" : "Today"
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return "أمس"
+      return t.yesterday
     } else {
-      return date.toLocaleDateString("ar-SA", { weekday: "long", month: "short", day: "numeric" })
+      return date.toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", { weekday: "long", month: "short", day: "numeric" })
     }
   }
 
@@ -337,7 +337,7 @@ export default function ChatRoomPage() {
     
     // متصل الآن
     if (otherUser.is_online) {
-      return "متصل الآن 🟢"
+      return language === "ar" ? "متصل الآن 🟢" : "Online now 🟢"
     }
     
     // آخر ظهور
@@ -350,20 +350,20 @@ export default function ChatRoomPage() {
       const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
       // حالات أكثر واقعية
-      if (minutes < 2) return "متصل الآن 🟢"
-      if (minutes < 5) return "متصل منذ قليل 🟡"
-      if (minutes < 15) return `آخر ظهور منذ ${minutes} دقيقة`
-      if (minutes < 30) return "آخر ظهور منذ ربع ساعة"
-      if (minutes < 60) return "آخر ظهور منذ نصف ساعة"
-      if (hours === 1) return "آخر ظهور منذ ساعة"
-      if (hours < 6) return `آخر ظهور منذ ${hours} ساعات`
-      if (hours < 12) return "آخر ظهور اليوم صباحاً"
-      if (hours < 24) return "آخر ظهور اليوم"
-      if (days === 1) return "آخر ظهور أمس"
-      if (days < 7) return `آخر ظهور منذ ${days} أيام`
-      return `آخر ظهور ${formatDate(otherUser.last_seen)}`
+      if (minutes < 2) return language === "ar" ? "متصل الآن 🟢" : "Online now 🟢"
+      if (minutes < 5) return language === "ar" ? "متصل منذ قليل 🟡" : "Online recently 🟡"
+      if (minutes < 15) return language === "ar" ? `آخر ظهور منذ ${minutes} دقيقة` : `Last seen ${minutes} minutes ago`
+      if (minutes < 30) return language === "ar" ? "آخر ظهور منذ ربع ساعة" : "Last seen 15 minutes ago"
+      if (minutes < 60) return language === "ar" ? "آخر ظهور منذ نصف ساعة" : "Last seen 30 minutes ago"
+      if (hours === 1) return language === "ar" ? "آخر ظهور منذ ساعة" : "Last seen 1 hour ago"
+      if (hours < 6) return language === "ar" ? `آخر ظهور منذ ${hours} ساعات` : `Last seen ${hours} hours ago`
+      if (hours < 12) return language === "ar" ? "آخر ظهور اليوم صباحاً" : "Last seen this morning"
+      if (hours < 24) return language === "ar" ? "آخر ظهور اليوم" : "Last seen today"
+      if (days === 1) return language === "ar" ? "آخر ظهور أمس" : "Last seen yesterday"
+      if (days < 7) return language === "ar" ? `آخر ظهور منذ ${days} أيام` : `Last seen ${days} days ago`
+      return language === "ar" ? `آخر ظهور ${formatDate(otherUser.last_seen)}` : `Last seen ${formatDate(otherUser.last_seen)}`
     }
-    return "غير متصل"
+    return language === "ar" ? "غير متصل" : "Offline"
   }
 
   // تجميع الرسائل حسب التاريخ
@@ -383,7 +383,7 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] -mx-4 -mt-4 relative" dir="rtl">
+    <div className={`flex flex-col h-[calc(100vh-140px)] -mx-4 -mt-4 relative ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b bg-background/95 backdrop-blur sticky top-0 z-10">
         <Button variant="ghost" size="icon" onClick={() => router.push("/chat")}>
@@ -393,7 +393,7 @@ export default function ChatRoomPage() {
         <div className="relative">
           <Avatar className="h-10 w-10">
             <AvatarImage src={otherUser?.avatar} />
-            <AvatarFallback>{otherUser?.name?.[0] || "؟"}</AvatarFallback>
+            <AvatarFallback>{otherUser?.name?.[0] || "?"}</AvatarFallback>
           </Avatar>
           {otherUser?.is_online && (
             <span className="absolute bottom-0 left-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
@@ -401,10 +401,10 @@ export default function ChatRoomPage() {
         </div>
 
         <div className="flex-1">
-          <h2 className="font-semibold">{otherUser?.name || "محادثة"}</h2>
+          <h2 className="font-semibold">{otherUser?.name || t.conversation}</h2>
           <p className="text-xs text-muted-foreground">
             {otherIsTyping ? (
-              <span className="text-primary animate-pulse">يكتب...</span>
+              <span className="text-primary animate-pulse">{t.typing}</span>
             ) : (
               getPresenceText()
             )}
@@ -458,7 +458,7 @@ export default function ChatRoomPage() {
                         onClick={() => handleReply(msg)}
                         className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-primary mb-1 ${isMe ? "mr-2" : "ml-2"}`}
                       >
-                        ↩️ رد
+                        ↩️ {t.reply}
                       </button>
                     )}
                     
@@ -479,7 +479,7 @@ export default function ChatRoomPage() {
                           }`}
                         >
                           <p className={`text-[10px] font-medium ${isMe ? "text-primary-foreground/70" : "text-primary"}`}>
-                            {replyToMessage.sender_id === user?.id ? "أنت" : otherUser?.name}
+                            {replyToMessage.sender_id === user?.id ? (language === "ar" ? "أنت" : "You") : otherUser?.name}
                           </p>
                           <p className={`text-xs truncate ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                             {replyToMessage.content.substring(0, 50)}{replyToMessage.content.length > 50 ? "..." : ""}
@@ -533,7 +533,7 @@ export default function ChatRoomPage() {
           className="absolute bottom-36 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm hover:bg-primary/90 transition-colors z-20"
         >
           <span>⬇️</span>
-          <span>آخر الرسائل</span>
+          <span>{language === "ar" ? "آخر الرسائل" : "Latest messages"}</span>
         </button>
       )}
 
@@ -556,9 +556,9 @@ export default function ChatRoomPage() {
       {/* شريط الرد */}
       {replyTo && (
         <div className="px-4 py-2 border-t bg-muted/50 flex items-center gap-3">
-          <div className="flex-1 border-r-2 border-primary pr-3">
+          <div className={`flex-1 border-${language === "ar" ? "r" : "l"}-2 border-primary ${language === "ar" ? "pr-3" : "pl-3"}`}>
             <p className="text-xs text-primary font-medium">
-              رد على {replyTo.sender_id === user?.id ? "نفسك" : otherUser?.name}
+              {language === "ar" ? "رد على" : "Reply to"} {replyTo.sender_id === user?.id ? (language === "ar" ? "نفسك" : "yourself") : otherUser?.name}
             </p>
             <p className="text-sm text-muted-foreground truncate">
               {replyTo.content.substring(0, 60)}{replyTo.content.length > 60 ? "..." : ""}
@@ -584,7 +584,7 @@ export default function ChatRoomPage() {
         >
           <Input
             ref={inputRef}
-            placeholder={replyTo ? "اكتب ردك..." : "اكتب رسالة..."}
+            placeholder={replyTo ? (language === "ar" ? "اكتب ردك..." : "Type your reply...") : (language === "ar" ? "اكتب رسالة..." : "Type a message...")}
             value={newMessage}
             onChange={handleInputChange}
             disabled={sending}
