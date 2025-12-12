@@ -8,6 +8,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+function resolveSiteUrl(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  const host = request.headers.get("host")
+  if (host) {
+    const protocol = host.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  }
+
+  return ""
+}
+
 // أنواع المهام
 const TASK_TYPES = {
   daily: { label: "يومية", emoji: "📅", color: "blue" },
@@ -338,20 +356,50 @@ export async function POST(request: NextRequest) {
 
       // إرسال إشعارات للمشاركين
       const creatorName = userData.user.user_metadata?.full_name || "مستخدم"
-      const notifications = member_ids
-        .filter((id: string) => id !== userData.user.id)
-        .map((user_id: string) => ({
-          user_id,
-          title: `📋 مهمة جماعية جديدة`,
-          body: `${creatorName} أضافك لمهمة: ${title}`,
-          type: "task",
-          url: `/tasks/${task.id}`,
-          data: { taskId: task.id },
-          is_read: false
-        }))
+      const targetMembers = member_ids.filter((id: string) => id !== userData.user.id)
+      const notifications = targetMembers.map((user_id: string) => ({
+        user_id,
+        title: `📋 مهمة جماعية جديدة`,
+        body: `${creatorName} أضافك لمهمة: ${title}`,
+        type: "task",
+        url: `/tasks/${task.id}`,
+        data: { taskId: task.id, type: "task" },
+        is_read: false
+      }))
 
       if (notifications.length > 0) {
         await adminClient.from("notifications").insert(notifications)
+
+        // إرسال إشعار Push
+        try {
+          const siteUrl = resolveSiteUrl(request)
+          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+
+          await Promise.all(
+            targetMembers.map(async (uid: string) => {
+              try {
+                const resp = await fetch(targetUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    userId: uid,
+                    title: `📋 مهمة جماعية جديدة`,
+                    body: `${creatorName} أضافك لمهمة: ${title}`,
+                    url: `/tasks/${task.id}`,
+                    data: { taskId: task.id, type: "task" }
+                  })
+                })
+                if (!resp.ok) {
+                  console.error("Push task notify failed for user:", uid)
+                }
+              } catch (pushErr) {
+                console.error("Push task notify error:", pushErr)
+              }
+            })
+          )
+        } catch (pushErrOuter) {
+          console.error("Push task notify outer error:", pushErrOuter)
+        }
       }
     }
 
