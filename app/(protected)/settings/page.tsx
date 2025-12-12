@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +19,8 @@ export default function SettingsPage() {
   const { user, signOut, updatePhoneNumber } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
   const requirePhone = searchParams.get("requirePhone") === "true"
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -72,13 +76,13 @@ export default function SettingsPage() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setError("الرجاء اختيار صورة صحيحة")
+      setError(t.imageError)
       return
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      setError("حجم الصورة يجب أن يكون أقل من 2 ميجابايت")
+      setError(t.imageSizeError)
       return
     }
 
@@ -97,7 +101,7 @@ export default function SettingsPage() {
 
       if (uploadError) {
         console.error("Upload error:", uploadError)
-        setError("حدث خطأ أثناء رفع الصورة")
+        setError(t.uploadError)
         setIsUploadingAvatar(false)
         return
       }
@@ -176,7 +180,7 @@ export default function SettingsPage() {
         })
         
         if (nameError) {
-          setError("حدث خطأ أثناء حفظ الاسم. الرجاء المحاولة مرة أخرى.")
+          setError(language === "ar" ? "حدث خطأ أثناء حفظ الاسم. الرجاء المحاولة مرة أخرى." : "Error saving name. Please try again.")
           setIsSaving(false)
           return
         }
@@ -214,7 +218,7 @@ export default function SettingsPage() {
 
         if (checkResult.error) {
           console.error("❌ Error checking phone:", checkResult.error)
-          setError("حدث خطأ أثناء التحقق من رقم الجوال")
+          setError(language === "ar" ? "حدث خطأ أثناء التحقق من رقم الجوال" : "Error checking phone number")
           setIsSaving(false)
           return
         }
@@ -224,7 +228,7 @@ export default function SettingsPage() {
           const { error: updateError } = await updatePhoneNumber(normalizedPhone)
           
           if (updateError) {
-            setError("حدث خطأ أثناء حفظ رقم الجوال. الرجاء المحاولة مرة أخرى.")
+            setError(language === "ar" ? "حدث خطأ أثناء حفظ رقم الجوال. الرجاء المحاولة مرة أخرى." : "Error saving phone number. Please try again.")
             setIsSaving(false)
             return
           }
@@ -233,7 +237,7 @@ export default function SettingsPage() {
       }
 
       if (hasChanges) {
-        setSuccess("تم حفظ التغييرات بنجاح!")
+        setSuccess(t.changesSaved)
 
         if (requirePhone) {
           setTimeout(() => {
@@ -241,11 +245,11 @@ export default function SettingsPage() {
           }, 1000)
         }
       } else {
-        setSuccess("لا توجد تغييرات لحفظها.")
+        setSuccess(t.noChanges)
       }
     } catch (err) {
       console.error("Error saving profile:", err)
-      setError("حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.")
+      setError(t.unexpectedError)
     } finally {
       setIsSaving(false)
     }
@@ -257,23 +261,23 @@ export default function SettingsPage() {
   }
 
   if (!user) {
-    return <div className="text-center text-red-500">خطأ: لم يتم تحميل بيانات المستخدم.</div>
+    return <div className="text-center text-red-500">{t.errorLoadingUser}</div>
   }
 
   const hasPhoneNumber = !!user.user_metadata?.phone_number
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className={`max-w-2xl mx-auto space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       <div>
-        <h1 className="text-2xl font-bold">الإعدادات</h1>
-        <p className="text-muted-foreground">إدارة معلومات حسابك وتفضيلاتك</p>
+        <h1 className="text-2xl font-bold">{t.settingsTitle}</h1>
+        <p className="text-muted-foreground">{language === "ar" ? "إدارة معلومات حسابك وتفضيلاتك" : "Manage your account information and preferences"}</p>
       </div>
 
       {requirePhone && !hasPhoneNumber && (
         <Card className="border-amber-500/50 bg-amber-500/10">
           <CardContent className="pt-6">
             <p className="text-sm text-amber-600 dark:text-amber-400">
-              ⚠️ يجب ربط رقم جوالك لإكمال تسجيل الدخول والوصول إلى التطبيق.
+              ⚠️ {t.phoneRequired}
             </p>
           </CardContent>
         </Card>
@@ -378,7 +382,7 @@ export default function SettingsPage() {
             disabled={isSaving || (!phoneNumber.trim() && requirePhone)}
             className="w-full"
           >
-            {isSaving ? "جاري الحفظ..." : requirePhone && !hasPhoneNumber ? "ربط رقم الجوال والمتابعة" : "حفظ التغييرات"}
+            {isSaving ? t.saving : requirePhone && !hasPhoneNumber ? t.linkPhone : t.saveChanges}
           </Button>
 
           {/* رسائل الخطأ تحت زر الحفظ */}
@@ -468,13 +472,13 @@ export default function SettingsPage() {
       {/* تسجيل الخروج */}
       <Card className="border-red-500/20">
         <CardHeader>
-          <CardTitle className="text-red-500">تسجيل الخروج</CardTitle>
-          <CardDescription>الخروج من حسابك على هذا الجهاز</CardDescription>
+          <CardTitle className="text-red-500">{t.logout}</CardTitle>
+          <CardDescription>{t.logoutDesc}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="destructive" onClick={handleSignOut} className="w-full">
-            <LogOutIcon className="ml-2 h-4 w-4" />
-            تسجيل الخروج
+            <LogOutIcon className={`${language === "ar" ? "ml-2" : "mr-2"} h-4 w-4`} />
+            {t.logout}
           </Button>
         </CardContent>
       </Card>
