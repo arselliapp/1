@@ -13,7 +13,10 @@ import {
   PhoneIcon,
   MessageSquareIcon,
   CheckCircleIcon,
-  StarIcon
+  StarIcon,
+  MailIcon,
+  CalendarIcon,
+  ListTodoIcon
 } from "@/components/icons"
 
 export default function LandingPage() {
@@ -22,27 +25,45 @@ export default function LandingPage() {
   const features = [
     {
       icon: <SendIcon className="w-8 h-8" />,
-      title: "إرسال الطلبات",
-      description: "أرسل طلباتك لجهات اتصالك بسهولة - سواء كانت طلب اتصال، رسالة، أو أي نوع آخر من الطلبات",
-      color: "from-emerald-500 to-teal-600"
+      title: "نظام طلبات ذكي",
+      description: "منصة متكاملة لإرسال وإدارة الطلبات بأنواع متعددة (اتصال، رسالة، تذكير، اجتماع، دعوة زواج) مع نظام ردود ذكي وتصنيف تلقائي",
+      color: "from-emerald-500 to-teal-600",
+      businessValue: "فرصة سوقية كبيرة في مجال التواصل الاجتماعي والمناسبات"
     },
     {
-      icon: <UsersIcon className="w-8 h-8" />,
-      title: "إدارة جهات الاتصال",
-      description: "أضف أصدقاءك وعائلتك عبر رقم الجوال أو البريد الإلكتروني وتواصل معهم بسهولة",
-      color: "from-blue-500 to-indigo-600"
+      icon: <MessageSquareIcon className="w-8 h-8" />,
+      title: "نظام محادثات متقدم",
+      description: "نظام دردشة كامل مع رسائل نصية، ردود على الرسائل، حالة القراءة، ومؤشر الكتابة مع إشعارات فورية",
+      color: "from-blue-500 to-indigo-600",
+      businessValue: "منافسة مباشرة لتطبيقات المراسلة التقليدية"
+    },
+    {
+      icon: <CalendarIcon className="w-8 h-8" />,
+      title: "إدارة تنبيهات ومواعيد",
+      description: "نظام متكامل لإدارة التنبيهات والمواعيد مع جدولة تلقائية، إشعارات مسبقة، وقبول/رفض الطلبات",
+      color: "from-orange-500 to-red-600",
+      businessValue: "حل متكامل لإدارة المناسبات والمواعيد الاجتماعية"
+    },
+    {
+      icon: <ListTodoIcon className="w-8 h-8" />,
+      title: "نظام مهام جماعية",
+      description: "إدارة مهام جماعية مع تتبع التقدم، إشعارات فورية، ومشاركة بين المستخدمين - مثالي للعائلات والفرق",
+      color: "from-purple-500 to-pink-600",
+      businessValue: "سوق متنامي في مجال إدارة المهام التعاونية"
     },
     {
       icon: <BellIcon className="w-8 h-8" />,
-      title: "إشعارات فورية",
-      description: "احصل على إشعارات فورية عند وصول طلب جديد أو رد على طلباتك",
-      color: "from-orange-500 to-red-600"
+      title: "إشعارات Push متقدمة",
+      description: "نظام إشعارات Push متكامل يعمل حتى عند إغلاق التطبيق، مع دعم متصفحات متعددة وتخزين في قاعدة البيانات",
+      color: "from-cyan-500 to-blue-600",
+      businessValue: "تقنية حديثة تضمن وصول الإشعارات 100%"
     },
     {
       icon: <ShieldIcon className="w-8 h-8" />,
-      title: "خصوصية وأمان",
-      description: "بياناتك محمية بالكامل ولا يمكن لأحد الوصول إليها إلا أنت",
-      color: "from-purple-500 to-pink-600"
+      title: "أمان وخصوصية عالية",
+      description: "حماية كاملة للبيانات مع Row Level Security، تشفير الاتصالات، ونظام مصادقة آمن",
+      color: "from-violet-500 to-purple-600",
+      businessValue: "متوافق مع معايير الأمان العالمية"
     }
   ]
 
@@ -105,16 +126,16 @@ export default function LandingPage() {
           
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
             <span className="bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              تواصل مع من تحب
+              منصة تواصل اجتماعي
             </span>
             <br />
             <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-              بطريقة أسهل
+              متكاملة وذكية
             </span>
           </h1>
           
           <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-            أرسل طلباتك لجهات اتصالك واحصل على ردود فورية. سواء كنت تريد اتصالاً، رسالة، أو تذكيراً - كل شيء في مكان واحد.
+            تطبيق ويب متكامل يجمع بين نظام طلبات ذكي، محادثات فورية، إدارة تنبيهات ومواعيد، ومهام جماعية - كل ذلك في منصة واحدة حديثة وآمنة.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -162,7 +183,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
             <Card 
               key={index}
@@ -174,7 +195,13 @@ export default function LandingPage() {
                   {feature.icon}
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{feature.description}</p>
+                <p className="text-slate-400 text-sm leading-relaxed mb-3">{feature.description}</p>
+                {feature.businessValue && (
+                  <div className="pt-3 border-t border-slate-700/50">
+                    <p className="text-xs text-emerald-400 font-semibold">💼 القيمة التجارية:</p>
+                    <p className="text-xs text-slate-500 mt-1">{feature.businessValue}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -266,44 +293,197 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* دعوة للعمل */}
+      {/* القيمة التجارية والفرص */}
       <section className="relative z-10 container mx-auto px-4 py-16 md:py-24">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+              الفرص الاستثمارية
+            </span>
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto">
+            منصة متكاملة جاهزة للتوسع والنمو
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16">
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/20">
+            <CardContent className="p-6 text-center">
+              <div className="text-4xl font-bold text-emerald-400 mb-2">100%</div>
+              <h3 className="text-lg font-bold text-white mb-2">جاهزية تقنية</h3>
+              <p className="text-slate-400 text-sm">تطبيق كامل ومكتمل بجميع المميزات</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20">
+            <CardContent className="p-6 text-center">
+              <div className="text-4xl font-bold text-blue-400 mb-2">PWA</div>
+              <h3 className="text-lg font-bold text-white mb-2">تطبيق ويب متقدم</h3>
+              <p className="text-slate-400 text-sm">يعمل على جميع الأجهزة بدون تثبيت</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+            <CardContent className="p-6 text-center">
+              <div className="text-4xl font-bold text-purple-400 mb-2">∞</div>
+              <h3 className="text-lg font-bold text-white mb-2">قابلية التوسع</h3>
+              <p className="text-slate-400 text-sm">بنية تحتية قابلة للتوسع بلا حدود</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-3xl p-8 md:p-16 text-center max-w-4xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
-            جاهز للبدء؟
+            جاهز للاستثمار؟
           </h2>
           <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-            انضم إلى آلاف المستخدمين الذين يستخدمون أرسل لي للتواصل مع من يحبون
+            منصة متكاملة جاهزة للنمو والتوسع. تواصل معنا لمناقشة الفرص الاستثمارية
           </p>
-          <Link href="/login">
-            <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-10 py-6 text-lg rounded-2xl shadow-xl shadow-emerald-500/25 transition-all hover:scale-105">
-              <SendIcon className="ml-2 w-5 h-5" />
-              سجّل الآن مجاناً
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link href="/login">
+              <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-6 text-lg rounded-2xl shadow-xl shadow-emerald-500/25 transition-all hover:scale-105">
+                <SendIcon className="ml-2 w-5 h-5" />
+                جرب التطبيق
+              </Button>
+            </Link>
+            <a href="#contact">
+              <Button variant="outline" className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 px-8 py-6 text-lg rounded-2xl">
+                <PhoneIcon className="ml-2 w-5 h-5" />
+                تواصل معنا
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* معلومات الاتصال */}
+      <section id="contact" className="relative z-10 container mx-auto px-4 py-16 md:py-24">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+              معلومات الاتصال
+            </span>
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto">
+            للاستفسارات والفرص الاستثمارية
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <Card className="bg-slate-800/50 border-slate-700/50 hover:border-emerald-500/50 transition-all">
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4">
+                <MailIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">البريد الإلكتروني</h3>
+              <a 
+                href="mailto:badar.mons@gmail.com" 
+                className="text-emerald-400 hover:text-emerald-300 text-lg font-semibold break-all"
+              >
+                badar.mons@gmail.com
+              </a>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-800/50 border-slate-700/50 hover:border-emerald-500/50 transition-all">
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4">
+                <PhoneIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">رقم الجوال</h3>
+              <a 
+                href="https://wa.me/966533221164" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 text-lg font-semibold"
+              >
+                +966 53 322 1164
+              </a>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
       {/* الفوتر */}
-      <footer className="relative z-10 border-t border-slate-800 py-8">
+      <footer className="relative z-10 border-t border-slate-800 py-12">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-                <SendIcon className="w-5 h-5 text-white" />
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+                  <SendIcon className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-xl font-bold text-white">أرسل لي</span>
               </div>
-              <span className="text-lg font-bold text-white">أرسل لي</span>
+              <p className="text-slate-400 text-sm">
+                منصة تواصل اجتماعي متكاملة تجمع بين الطلبات، المحادثات، التنبيهات، والمهام في مكان واحد.
+              </p>
             </div>
-            <div className="text-slate-500 text-sm text-center">
-              جميع الحقوق محفوظة © {new Date().getFullYear()} - برمجة وتطوير:{" "}
-              <a 
-                href="https://wa.me/966533221164" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-emerald-400 hover:text-emerald-300"
-              >
-                بدر مونس الشراري أبو غيث
-              </a>
+            
+            <div>
+              <h4 className="text-white font-bold mb-4">معلومات الاتصال</h4>
+              <div className="space-y-3">
+                <a 
+                  href="mailto:badar.mons@gmail.com" 
+                  className="flex items-center gap-3 text-slate-400 hover:text-emerald-400 transition-colors text-sm"
+                >
+                  <MailIcon className="w-5 h-5" />
+                  badar.mons@gmail.com
+                </a>
+                <a 
+                  href="https://wa.me/966533221164" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-slate-400 hover:text-emerald-400 transition-colors text-sm"
+                >
+                  <PhoneIcon className="w-5 h-5" />
+                  +966 53 322 1164
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-white font-bold mb-4">روابط سريعة</h4>
+              <div className="space-y-2">
+                <Link href="/login" className="block text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                  تسجيل الدخول
+                </Link>
+                <a href="#features" className="block text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                  المميزات
+                </a>
+                <a href="#contact" className="block text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                  اتصل بنا
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-800 pt-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-slate-500 text-sm text-center">
+                جميع الحقوق محفوظة © {new Date().getFullYear()} - برمجة وتطوير:{" "}
+                <a 
+                  href="https://wa.me/966533221164" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:text-emerald-300"
+                >
+                  بدر مونس الشراري أبو غيث
+                </a>
+              </div>
+              <div className="flex items-center gap-4">
+                <a 
+                  href="mailto:badar.mons@gmail.com" 
+                  className="text-slate-500 hover:text-emerald-400 transition-colors"
+                >
+                  <MailIcon className="w-5 h-5" />
+                </a>
+                <a 
+                  href="https://wa.me/966533221164" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-500 hover:text-emerald-400 transition-colors"
+                >
+                  <PhoneIcon className="w-5 h-5" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
