@@ -37,16 +37,20 @@ export function usePendingRequests(pollInterval = 10000) {
 
         // جلب عدد التنبيهات المعلقة والرسائل غير المقروءة بالتوازي مع معالجة الأخطاء
         const [remindersResult, messagesResult] = await Promise.allSettled([
-          // تنبيهات معلقة واردة
-          supabase
-            .from("reminders")
-            .select("id", { count: "exact", head: true })
-            .eq("recipient_id", userId)
-            .eq("status", "pending")
-            .catch((err) => {
+          // تنبيهات معلقة واردة - استخدام Promise wrapper لمعالجة الأخطاء
+          (async () => {
+            try {
+              const result = await supabase
+                .from("reminders")
+                .select("id", { count: "exact", head: true })
+                .eq("recipient_id", userId)
+                .eq("status", "pending")
+              return result
+            } catch (err) {
               console.warn("[use-pending-requests] Reminders fetch error:", err)
-              return { count: 0, error: null }
-            }),
+              return { count: 0, error: null, data: null }
+            }
+          })(),
           // رسائل غير مقروءة - استخدام API route بدلاً من استعلام مباشر
           fetch("/api/conversations", {
             headers: {
