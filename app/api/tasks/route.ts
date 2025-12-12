@@ -324,7 +324,11 @@ export async function POST(request: NextRequest) {
     })
 
     // إضافة المشاركين الآخرين
+    console.log("[tasks/route] Task creation - is_group_task:", is_group_task, "member_ids.length:", member_ids.length)
+    
     if (is_group_task && member_ids.length > 0) {
+      console.log("[tasks/route] Processing group task with", member_ids.length, "members")
+      
       const memberAssignments = member_ids
         .filter((id: string) => id !== userData.user.id)
         .map((user_id: string) => ({
@@ -335,11 +339,13 @@ export async function POST(request: NextRequest) {
 
       if (memberAssignments.length > 0) {
         await adminClient.from("task_assignments").insert(memberAssignments)
+        console.log("[tasks/route] ✅ Task assignments saved for", memberAssignments.length, "members")
       }
 
       // إرسال إشعارات للمشاركين
       const creatorName = userData.user.user_metadata?.full_name || "مستخدم"
       const targetMembers = member_ids.filter((id: string) => id !== userData.user.id)
+      console.log("[tasks/route] Target members for notifications:", targetMembers.length, targetMembers)
       
       const taskNotificationData = { taskId: task.id, type: "task" }
       console.log("[tasks/route] Creating task notifications for members:", targetMembers.length)
@@ -357,8 +363,9 @@ export async function POST(request: NextRequest) {
 
       if (notifications.length > 0) {
         await adminClient.from("notifications").insert(notifications)
+        console.log("[tasks/route] ✅ Notifications saved to database for", targetMembers.length, "members")
 
-        // إرسال إشعار Push باستخدام URL مطلق
+        // إرسال إشعار Push باستخدام URL مطلق (مثل reminders و messages)
         try {
           const targetUrl = getNotificationsSendUrl(request)
           if (!targetUrl) {
@@ -366,30 +373,37 @@ export async function POST(request: NextRequest) {
           } else {
             console.log("[tasks/route] Sending push notifications to:", targetUrl, "for", targetMembers.length, "members")
             
-            await Promise.all(
-              targetMembers.map(async (uid: string) => {
-                try {
-                  const resp = await fetch(targetUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      userId: uid,
-                      title: `📋 مهمة جماعية جديدة`,
-                      body: `${creatorName} أضافك لمهمة: ${title}`,
-                      url: `/tasks/${task.id}`,
-                      data: taskNotificationData
-                    })
+            // إرسال جميع الطلبات بشكل متوازي باستخدام Promise.allSettled (لا يتوقف عند فشل أحدها)
+            const pushPromises = targetMembers.map(async (uid: string) => {
+              try {
+                const resp = await fetch(targetUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    userId: uid,
+                    title: `📋 مهمة جماعية جديدة`,
+                    body: `${creatorName} أضافك لمهمة: ${title}`,
+                    url: `/tasks/${task.id}`,
+                    data: taskNotificationData
                   })
-                  if (!resp.ok) {
-                    console.error("[tasks/route] Push notification failed for user:", uid, resp.status, resp.statusText)
-                  } else {
-                    console.log("[tasks/route] ✅ Push notification sent successfully to user:", uid)
-                  }
-                } catch (pushErr) {
-                  console.error("[tasks/route] Push notification error for user:", uid, pushErr)
+                })
+                if (!resp.ok) {
+                  console.error("[tasks/route] Push notification failed for user:", uid, resp.status, resp.statusText)
+                  return { success: false, userId: uid, error: `HTTP ${resp.status}` }
+                } else {
+                  console.log("[tasks/route] ✅ Push notification sent successfully to user:", uid)
+                  return { success: true, userId: uid }
                 }
-              })
-            )
+              } catch (pushErr) {
+                console.error("[tasks/route] Push notification error for user:", uid, pushErr)
+                return { success: false, userId: uid, error: pushErr }
+              }
+            })
+            
+            // انتظار جميع الطلبات (باستخدام allSettled لا يتوقف عند فشل أحدها)
+            const results = await Promise.allSettled(pushPromises)
+            const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length
+            console.log("[tasks/route] ✅ Push notifications completed:", successCount, "of", targetMembers.length, "sent successfully")
           }
         } catch (pushErrOuter) {
           console.error("[tasks/route] Push notification outer error:", pushErrOuter)
