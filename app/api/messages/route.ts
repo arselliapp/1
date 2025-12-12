@@ -2,30 +2,12 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase-server"
+import { getNotificationsSendUrl, serializeNotificationData } from "@/app/api/notifications/utils"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-function resolveSiteUrl(request: NextRequest) {
-  // ترتيب أولوية الروابط: متغير بيئة عام -> رابط فيرسل -> هوست الطلب
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-
-  const host = request.headers.get("host")
-  if (host) {
-    const protocol = host.includes("localhost") ? "http" : "https"
-    return `${protocol}://${host}`
-  }
-
-  return ""
-}
 
 // جلب رسائل محادثة معينة
 export async function GET(request: NextRequest) {
@@ -208,41 +190,49 @@ export async function POST(request: NextRequest) {
       const senderName = userData.user.user_metadata?.full_name || 
                         userData.user.user_metadata?.name || 
                         "مستخدم"
-      const siteUrl = resolveSiteUrl(request)
+      
+      const notificationData = {
+        type: "message",
+        conversationId: conversation_id,
+        senderId: userData.user.id
+      }
 
-      // حفظ في قاعدة البيانات
+      console.log("[messages/route] Preparing notification for user:", otherParticipant.user_id)
+      console.log("[messages/route] Notification data:", notificationData)
+
+      // حفظ في قاعدة البيانات مع data كـ JSON string
       await adminClient.from("notifications").insert({
         user_id: otherParticipant.user_id,
         title: `💬 رسالة جديدة من ${senderName}`,
         body: content.length > 50 ? content.substring(0, 50) + "..." : content,
         type: "message",
         url: `/chat/${conversation_id}`,
-        data: { conversationId: conversation_id, senderId: userData.user.id },
+        data: serializeNotificationData(notificationData),
         is_read: false
       })
 
-      // إرسال Push Notification
+      // إرسال Push Notification باستخدام URL مطلق
       try {
-        const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-
-        await fetch(targetUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: otherParticipant.user_id,
-            title: `💬 ${senderName}`,
-            body: content.length > 100 ? content.substring(0, 100) + "..." : content,
-            url: `/chat/${conversation_id}`,
-            data: { 
-              type: "message",
-              conversationId: conversation_id, 
-              senderId: userData.user.id 
-            }
+        const targetUrl = getNotificationsSendUrl(request)
+        if (!targetUrl) {
+          console.warn("[messages/route] Cannot resolve site URL, skipping push notification")
+        } else {
+          console.log("[messages/route] Sending push notification to:", targetUrl)
+          await fetch(targetUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: otherParticipant.user_id,
+              title: `💬 ${senderName}`,
+              body: content.length > 100 ? content.substring(0, 100) + "..." : content,
+              url: `/chat/${conversation_id}`,
+              data: notificationData
+            })
           })
-        })
-        console.log("✅ Push notification sent for message")
+          console.log("[messages/route] ✅ Push notification sent for message")
+        }
       } catch (pushError) {
-        console.log("Push notification failed:", pushError)
+        console.error("[messages/route] Push notification failed:", pushError)
       }
     }
 

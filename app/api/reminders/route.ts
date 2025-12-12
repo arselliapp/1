@@ -2,29 +2,12 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase-server"
+import { getNotificationsSendUrl, serializeNotificationData } from "@/app/api/notifications/utils"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-function resolveSiteUrl(request: NextRequest) {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-
-  const host = request.headers.get("host")
-  if (host) {
-    const protocol = host.includes("localhost") ? "http" : "https"
-    return `${protocol}://${host}`
-  }
-
-  return ""
-}
 
 // أنواع التنبيهات
 const REMINDER_TYPES = {
@@ -219,33 +202,46 @@ export async function POST(request: NextRequest) {
                       "مستخدم"
     const typeInfo = REMINDER_TYPES[reminder_type as keyof typeof REMINDER_TYPES]
 
+    const reminderNotificationData = {
+      reminderId: reminder.id,
+      reminderType: reminder_type,
+      type: "reminder"
+    }
+    console.log("[reminders/route] Creating reminder notification for user:", recipient_id)
+    console.log("[reminders/route] Reminder notification data:", reminderNotificationData)
+
     await adminClient.from("notifications").insert({
       user_id: recipient_id,
       title: `${typeInfo.emoji} ${typeInfo.label} من ${senderName}`,
       body: title,
       type: "reminder",
       url: "/reminders",
-      data: { reminderId: reminder.id, reminderType: reminder_type },
+      data: serializeNotificationData(reminderNotificationData),
       is_read: false
     })
 
-    // إرسال Push Notification فوري
+    // إرسال Push Notification فوري باستخدام URL مطلق
     try {
-      const siteUrl = resolveSiteUrl(request)
-      const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-      await fetch(targetUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: recipient_id,
-          title: `${typeInfo.emoji} ${typeInfo.label} من ${senderName}`,
-          body: title,
-          url: "/reminders",
-          data: { reminderId: reminder.id, reminderType: reminder_type, type: "reminder" }
+      const targetUrl = getNotificationsSendUrl(request)
+      if (!targetUrl) {
+        console.warn("[reminders/route] Cannot resolve site URL, skipping push notification")
+      } else {
+        console.log("[reminders/route] Sending push notification to:", targetUrl)
+        await fetch(targetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: recipient_id,
+            title: `${typeInfo.emoji} ${typeInfo.label} من ${senderName}`,
+            body: title,
+            url: "/reminders",
+            data: reminderNotificationData
+          })
         })
-      })
+        console.log("[reminders/route] ✅ Push notification sent successfully")
+      }
     } catch (pushErr) {
-      console.error("Failed to send push reminder:", pushErr)
+      console.error("[reminders/route] Failed to send push reminder:", pushErr)
     }
 
     return NextResponse.json({ reminder })
@@ -363,6 +359,10 @@ export async function PATCH(request: NextRequest) {
                          userData.user.user_metadata?.name || 
                          "مستخدم"
 
+    const responseNotificationData = { reminderId: reminder_id, status }
+    console.log("[reminders/route] Creating reminder response notification for user:", reminder.sender_id)
+    console.log("[reminders/route] Response notification data:", responseNotificationData)
+
     await adminClient.from("notifications").insert({
       user_id: reminder.sender_id,
       title: status === "accepted" 
@@ -371,7 +371,7 @@ export async function PATCH(request: NextRequest) {
       body: reminder.title,
       type: "reminder_response",
       url: "/reminders?tab=sent",
-      data: { reminderId: reminder_id, status },
+      data: serializeNotificationData(responseNotificationData),
       is_read: false
     })
 

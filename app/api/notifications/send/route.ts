@@ -1,6 +1,7 @@
 import { createRouteHandlerClient, createAdminClient } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 import webpush from "web-push"
+import { serializeNotificationData } from "../utils"
 
 // متغير لتتبع إعداد VAPID
 let vapidConfigured = false
@@ -132,20 +133,26 @@ export async function POST(request: Request) {
       console.log(`📊 Sent ${successCount} of ${subscriptions.length} notifications successfully`)
     }
 
-    // حفظ الإشعار في قاعدة البيانات كـ fallback
-    console.log("💾 Saving notification to database...")
+    // حفظ الإشعار في قاعدة البيانات كـ fallback مع data كـ JSON string
+    console.log("[notifications/send] 💾 Saving notification to database...")
     try {
+      const notificationData = data || {}
+      console.log("[notifications/send] Notification data to serialize:", notificationData)
+      
       const insertData = {
         user_id: userId,
         title: title || "إشعار جديد",
         body: body || "لديك إشعار جديد",
         type: data?.type || "general",
-        data: data || {},
+        data: serializeNotificationData(notificationData),
         url: url || defaultUrl,
         is_read: false,
       }
       
-      console.log("Insert data:", JSON.stringify(insertData))
+      console.log("[notifications/send] Insert data (with serialized data):", JSON.stringify({
+        ...insertData,
+        data: insertData.data // data is already a string
+      }))
       
       const { data: insertedNotification, error: dbError } = await adminClient
         .from("notifications")
@@ -154,14 +161,14 @@ export async function POST(request: Request) {
         .single()
       
       if (dbError) {
-        console.error("❌ Error saving notification to DB:", dbError)
-        console.error("Error code:", dbError.code)
-        console.error("Error message:", dbError.message)
+        console.error("[notifications/send] ❌ Error saving notification to DB:", dbError)
+        console.error("[notifications/send] Error code:", dbError.code)
+        console.error("[notifications/send] Error message:", dbError.message)
       } else {
-        console.log("✅ Notification saved to database:", insertedNotification?.id)
+        console.log("[notifications/send] ✅ Notification saved to database:", insertedNotification?.id)
       }
     } catch (err) {
-      console.error("❌ Error saving notification:", err)
+      console.error("[notifications/send] ❌ Error saving notification:", err)
     }
 
     return NextResponse.json({

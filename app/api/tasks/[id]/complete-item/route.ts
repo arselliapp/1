@@ -2,29 +2,12 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase-server"
+import { getNotificationsSendUrl, serializeNotificationData } from "@/app/api/notifications/utils"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-function resolveSiteUrl(request: NextRequest) {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-
-  const host = request.headers.get("host")
-  if (host) {
-    const protocol = host.includes("localhost") ? "http" : "https"
-    return `${protocol}://${host}`
-  }
-
-  return ""
-}
 
 // تحديد عنصر كمكتمل
 export async function POST(
@@ -144,50 +127,59 @@ export async function POST(
       // إرسال إشعار للآخرين
       const completerName = userData.user.user_metadata?.full_name || "مستخدم"
       const otherMembers = members?.filter(m => m.user_id !== userData.user.id) || []
-      const siteUrl = resolveSiteUrl(request)
       
       if (completed && otherMembers.length > 0) {
         const notifData = { taskId, itemId: item_id, type: "task_update", realtime: true }
+        console.log("[tasks/[id]/complete-item/route] Creating task update notifications for members:", otherMembers.length)
+        console.log("[tasks/[id]/complete-item/route] Task update notification data:", notifData)
 
-        // حفظ الإشعارات في قاعدة البيانات
+        // حفظ الإشعارات في قاعدة البيانات مع data كـ JSON string
         const notifications = otherMembers.map(m => ({
           user_id: m.user_id,
           title: `✅ تم إنجاز مهمة`,
           body: `${completerName} أنجز: ${item.title}`,
           type: "task_update",
           url: `/tasks/${taskId}`,
-          data: notifData,
+          data: serializeNotificationData(notifData),
           is_read: false
         }))
 
         const { error: notifError } = await adminClient.from("notifications").insert(notifications)
         if (notifError) {
-          console.error("Error inserting notifications:", notifError)
+          console.error("[tasks/[id]/complete-item/route] Error inserting notifications:", notifError)
+        } else {
+          console.log("[tasks/[id]/complete-item/route] ✅ Task update notifications saved to database")
         }
 
-        // إرسال إشعار push فوري لكل عضو
-        await Promise.all(otherMembers.map(async (m) => {
-          try {
-            const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-
-            const response = await fetch(targetUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: m.user_id,
-                title: `✅ تم إنجاز مهمة`,
-                body: `${completerName} أنجز: ${item.title}`,
-                url: `/tasks/${taskId}`,
-                data: notifData
+        // إرسال إشعار push فوري لكل عضو باستخدام URL مطلق
+        const targetUrl = getNotificationsSendUrl(request)
+        if (!targetUrl) {
+          console.warn("[tasks/[id]/complete-item/route] Cannot resolve site URL, skipping push notifications")
+        } else {
+          console.log("[tasks/[id]/complete-item/route] Sending push notifications to:", targetUrl)
+          await Promise.all(otherMembers.map(async (m) => {
+            try {
+              const response = await fetch(targetUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  userId: m.user_id,
+                  title: `✅ تم إنجاز مهمة`,
+                  body: `${completerName} أنجز: ${item.title}`,
+                  url: `/tasks/${taskId}`,
+                  data: notifData
+                })
               })
-            })
-            if (!response.ok) {
-              console.log("Push notification failed for user:", m.user_id)
+              if (!response.ok) {
+                console.error("[tasks/[id]/complete-item/route] Push notification failed for user:", m.user_id, response.status)
+              } else {
+                console.log("[tasks/[id]/complete-item/route] ✅ Push notification sent to user:", m.user_id)
+              }
+            } catch (e) {
+              console.error("[tasks/[id]/complete-item/route] Push notification error for user:", m.user_id, e)
             }
-          } catch (e) {
-            console.log("Push notification error:", e)
-          }
-        }))
+          }))
+        }
       }
     } else {
       // للمهام الفردية: تحديث مباشر
@@ -257,37 +249,47 @@ export async function POST(
         .eq("id", taskId)
 
       // إرسال إشعار لجميع المشاركين
+      const celebrationData = { taskId, completed: true, celebration: true }
+      console.log("[tasks/[id]/complete-item/route] Creating celebration notifications for all members")
+      console.log("[tasks/[id]/complete-item/route] Celebration notification data:", celebrationData)
+
       const celebrationNotifications = allMembers?.map(m => ({
         user_id: m.user_id,
         title: `🎉 مبروك! تم إنجاز المهمة`,
         body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
         type: "task_completed",
         url: `/tasks/${taskId}`,
-        data: { taskId, completed: true, celebration: true },
+        data: serializeNotificationData(celebrationData),
         is_read: false
       })) || []
 
       await adminClient.from("notifications").insert(celebrationNotifications)
+      console.log("[tasks/[id]/complete-item/route] ✅ Celebration notifications saved to database")
 
-      // إرسال إشعار push للجميع
-      const siteUrl = resolveSiteUrl(request)
-
-      for (const m of allMembers || []) {
-        try {
-          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-
-          await fetch(targetUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: m.user_id,
-              title: `🎉 مبروك! تم إنجاز المهمة`,
-              body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
-              url: `/tasks/${taskId}`,
-              data: { taskId, completed: true, celebration: true }
+      // إرسال إشعار push للجميع باستخدام URL مطلق
+      const targetUrl = getNotificationsSendUrl(request)
+      if (!targetUrl) {
+        console.warn("[tasks/[id]/complete-item/route] Cannot resolve site URL, skipping push notifications")
+      } else {
+        console.log("[tasks/[id]/complete-item/route] Sending celebration push notifications to:", targetUrl)
+        for (const m of allMembers || []) {
+          try {
+            await fetch(targetUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: m.user_id,
+                title: `🎉 مبروك! تم إنجاز المهمة`,
+                body: `تم إكمال جميع طلبات مهمة: ${task.title}`,
+                url: `/tasks/${taskId}`,
+                data: celebrationData
+              })
             })
-          })
-        } catch (e) { /* تجاهل أخطاء الإشعارات */ }
+            console.log("[tasks/[id]/complete-item/route] ✅ Celebration push notification sent to user:", m.user_id)
+          } catch (e) {
+            console.error("[tasks/[id]/complete-item/route] Celebration push notification error for user:", m.user_id, e)
+          }
+        }
       }
 
       return NextResponse.json({ 

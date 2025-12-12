@@ -2,24 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase-server"
-
-function resolveSiteUrl(request: NextRequest) {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-
-  const host = request.headers.get("host")
-  if (host) {
-    const protocol = host.includes("localhost") ? "http" : "https"
-    return `${protocol}://${host}`
-  }
-
-  return ""
-}
+import { getNotificationsSendUrl, serializeNotificationData } from "@/app/api/notifications/utils"
 
 export async function DELETE(
   request: NextRequest,
@@ -96,7 +79,9 @@ export async function DELETE(
       .filter(uid => uid && uid !== userData.user.id)
 
     if (otherMembers.length > 0) {
-      const siteUrl = resolveSiteUrl(request)
+      const deleteNotificationData = { taskId: params.id, type: "task_deleted" }
+      console.log("[tasks/[id]/route] Creating delete notifications for members:", otherMembers.length)
+      console.log("[tasks/[id]/route] Delete notification data:", deleteNotificationData)
 
       // حفظ إشعار في قاعدة البيانات
       const notifications = otherMembers.map(uid => ({
@@ -105,39 +90,46 @@ export async function DELETE(
         body: `قام المنشئ بحذف المهمة: ${task.title}`,
         type: "task_deleted",
         url: "/tasks",
-        data: { taskId: params.id }
+        data: serializeNotificationData(deleteNotificationData)
       }))
 
       try {
         await admin
           .from("notifications")
           .insert(notifications)
+        console.log("[tasks/[id]/route] ✅ Delete notifications saved to database")
       } catch (e) {
-        console.error("Failed to insert delete notifications:", e)
+        console.error("[tasks/[id]/route] Failed to insert delete notifications:", e)
       }
 
       const payload = {
         title: "🗑️ تم حذف مهمة",
         body: `قام المنشئ بحذف المهمة: ${task.title}`,
         url: "/tasks",
-        data: { taskId: params.id, type: "task_deleted" }
+        data: deleteNotificationData
       }
 
-      // استدعاء مسار الإشعارات لإرسال Push
-      await Promise.all(
-        otherMembers.map(async (uid) => {
-          try {
-            const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-            await fetch(targetUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId: uid, ...payload })
-            })
-          } catch (e) {
-            console.error("Failed to send delete notification", e)
-          }
-        })
-      )
+      // استدعاء مسار الإشعارات لإرسال Push باستخدام URL مطلق
+      const targetUrl = getNotificationsSendUrl(request)
+      if (!targetUrl) {
+        console.warn("[tasks/[id]/route] Cannot resolve site URL, skipping push notifications")
+      } else {
+        console.log("[tasks/[id]/route] Sending push notifications to:", targetUrl)
+        await Promise.all(
+          otherMembers.map(async (uid) => {
+            try {
+              await fetch(targetUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: uid, ...payload })
+              })
+              console.log("[tasks/[id]/route] ✅ Push notification sent to user:", uid)
+            } catch (e) {
+              console.error("[tasks/[id]/route] Failed to send delete notification for user:", uid, e)
+            }
+          })
+        )
+      }
     }
 
     return NextResponse.json({ success: true })

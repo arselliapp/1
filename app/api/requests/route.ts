@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase-server"
 import { createClient } from "@supabase/supabase-js"
 import { checkRateLimit, detectSpamPatterns } from "@/lib/anti-spam"
+import { serializeNotificationData } from "@/app/api/notifications/utils"
 
 export async function POST(request: NextRequest) {
   try {
@@ -128,17 +129,21 @@ export async function POST(request: NextRequest) {
 
       const typeInfo = typeMessages[type] || { title: "أرسل لك طلباً جديداً", emoji: "📩" }
 
+      const requestNotificationData = {
+        requestId: data.id,
+        senderId: session.user.id,
+        requestType: type,
+      }
+      console.log("[requests/route] Creating request notification for user:", recipient_id)
+      console.log("[requests/route] Request notification data:", requestNotificationData)
+
       const notificationData = {
         user_id: recipient_id,
         title: `${typeInfo.emoji} ${senderName} ${typeInfo.title}`,
         body: message.length > 80 ? message.substring(0, 80) + "..." : message,
         type: "reminder",
         url: "/reminders?tab=pending",
-        data: {
-          requestId: data.id,
-          senderId: session.user.id,
-          requestType: type,
-        },
+        data: serializeNotificationData(requestNotificationData),
         is_read: false,
       }
 
