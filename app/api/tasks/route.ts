@@ -363,7 +363,7 @@ export async function POST(request: NextRequest) {
         body: `${creatorName} أضافك لمهمة: ${title}`,
         type: "task",
         url: `/tasks/${task.id}`,
-        data: { taskId: task.id, type: "task" },
+        data: JSON.stringify({ taskId: task.id, type: "task" }),
         is_read: false
       }))
 
@@ -371,29 +371,42 @@ export async function POST(request: NextRequest) {
         await adminClient.from("notifications").insert(notifications)
 
         // إرسال إشعار Push
-        const siteUrl = resolveSiteUrl(request)
-        const payload = {
-          title: `📋 مهمة جماعية جديدة`,
-          body: `${creatorName} أضافك لمهمة: ${title}`,
-          url: `/tasks/${task.id}`,
-          data: { taskId: task.id, type: "task" }
+        try {
+          const siteUrl = resolveSiteUrl(request)
+          // استخدام URL مطلق دائماً - نفس الطريقة المستخدمة في التنبيهات
+          const targetUrl = siteUrl 
+            ? `${siteUrl}/api/notifications/send`
+            : `${request.nextUrl.origin}/api/notifications/send`
+          
+          console.log("Task creation push notification - siteUrl:", siteUrl, "targetUrl:", targetUrl, "members:", targetMembers.length)
+          
+          await Promise.all(
+            targetMembers.map(async (uid: string) => {
+              try {
+                const resp = await fetch(targetUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    userId: uid,
+                    title: `📋 مهمة جماعية جديدة`,
+                    body: `${creatorName} أضافك لمهمة: ${title}`,
+                    url: `/tasks/${task.id}`,
+                    data: { taskId: task.id, type: "task" }
+                  })
+                })
+                if (!resp.ok) {
+                  console.error("Push task notify failed for user:", uid, resp.status, resp.statusText)
+                } else {
+                  console.log("Push task notify sent successfully to user:", uid)
+                }
+              } catch (pushErr) {
+                console.error("Push task notify error for user:", uid, pushErr)
+              }
+            })
+          )
+        } catch (pushErrOuter) {
+          console.error("Push task notify outer error:", pushErrOuter)
         }
-
-        // استدعاء مسار الإشعارات لإرسال Push
-        await Promise.all(
-          targetMembers.map(async (uid: string) => {
-            try {
-              const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
-              await fetch(targetUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: uid, ...payload })
-              })
-            } catch (e) {
-              console.error("Failed to send task notification", e)
-            }
-          })
-        )
       }
     }
 
