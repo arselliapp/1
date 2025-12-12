@@ -8,9 +8,13 @@ import { Label } from "@/components/ui/label"
 import { UserPlusIcon, Loader2 } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 export function AddContactModal() {
   const { user } = useAuth()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
   const [isOpen, setIsOpen] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState("")
   const [isChecking, setIsChecking] = useState(false)
@@ -26,7 +30,7 @@ export function AddContactModal() {
     setUserDetails(null)
 
     if (!phoneNumber.trim()) {
-      setError("الرجاء إدخال رقم الجوال.")
+      setError(language === "ar" ? "الرجاء إدخال رقم الجوال." : "Please enter a phone number.")
       return
     }
 
@@ -37,7 +41,7 @@ export function AddContactModal() {
 
       if (error) {
         console.error("RPC Error:", error)
-        setError(error.message || "حدث خطأ أثناء التحقق من الرقم.")
+        setError(error.message || (language === "ar" ? "حدث خطأ أثناء التحقق من الرقم." : "Error checking phone number."))
         setIsChecking(false)
         return
       }
@@ -55,7 +59,7 @@ export function AddContactModal() {
       }
     } catch (err) {
       console.error("Error checking phone number:", err)
-      setError("حدث خطأ أثناء التحقق من الرقم.")
+      setError(language === "ar" ? "حدث خطأ أثناء التحقق من الرقم." : "Error checking phone number.")
     } finally {
       setIsChecking(false)
     }
@@ -76,10 +80,10 @@ export function AddContactModal() {
 
       if (error) {
         if (error.code === "23505") {
-          setError("جهة الاتصال موجودة بالفعل.")
+          setError(language === "ar" ? "جهة الاتصال موجودة بالفعل." : "Contact already exists.")
         } else {
           console.error("Insert Error:", error)
-          setError("حدث خطأ أثناء إضافة جهة الاتصال.")
+          setError(language === "ar" ? "حدث خطأ أثناء إضافة جهة الاتصال." : "Error adding contact.")
         }
         setIsAdding(false)
         return
@@ -93,7 +97,7 @@ export function AddContactModal() {
       window.location.reload()
     } catch (err) {
       console.error("Error adding contact:", err)
-      setError("حدث خطأ غير متوقع.")
+      setError(language === "ar" ? "حدث خطأ غير متوقع." : "An unexpected error occurred.")
     } finally {
       setIsAdding(false)
     }
@@ -113,24 +117,24 @@ export function AddContactModal() {
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
-          <UserPlusIcon className="ml-2 h-4 w-4" />
-          إضافة جهة اتصال
+          <UserPlusIcon className={`${language === "ar" ? "ml-2" : "mr-2"} h-4 w-4`} />
+          {t.addContact}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={`sm:max-w-[425px] ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
         <DialogHeader>
-          <DialogTitle>إضافة جهة اتصال جديدة</DialogTitle>
+          <DialogTitle>{language === "ar" ? "إضافة جهة اتصال جديدة" : "Add New Contact"}</DialogTitle>
           <DialogDescription>
-            أدخل رقم جوال الشخص الذي تريد إضافته. سيتم التحقق من تسجيله في البرنامج.
+            {language === "ar" ? "أدخل رقم جوال الشخص الذي تريد إضافته. سيتم التحقق من تسجيله في البرنامج." : "Enter the phone number of the person you want to add. We'll verify if they're registered in the app."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleCheck} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="contact-phone">رقم الجوال</Label>
+            <Label htmlFor="contact-phone">{t.phoneNumber}</Label>
             <Input
               id="contact-phone"
               type="tel"
-              placeholder="مثال: 0555123456"
+              placeholder={t.phoneNumberPlaceholder}
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               className="col-span-3"
@@ -143,16 +147,16 @@ export function AddContactModal() {
 
           {checkResult === "registered" && userDetails && (
             <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-              <p className="font-medium text-green-400">الرقم مسجل في البرنامج!</p>
-              <p className="text-sm text-muted-foreground">الاسم: {userDetails.name}</p>
-              <p className="text-sm text-muted-foreground">الجوال: {userDetails.phone}</p>
+              <p className="font-medium text-green-400">{language === "ar" ? "الرقم مسجل في البرنامج!" : "Phone number is registered!"}</p>
+              <p className="text-sm text-muted-foreground">{language === "ar" ? "الاسم:" : "Name:"} {userDetails.name}</p>
+              <p className="text-sm text-muted-foreground">{language === "ar" ? "الجوال:" : "Phone:"} {userDetails.phone}</p>
             </div>
           )}
 
           {checkResult === "not_registered" && (
             <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <p className="font-medium text-yellow-400">الرقم غير مسجل في البرنامج.</p>
-              <p className="text-sm text-muted-foreground">لا يمكن مراسلة هذا الرقم حالياً.</p>
+              <p className="font-medium text-yellow-400">{language === "ar" ? "الرقم غير مسجل في البرنامج." : "Phone number is not registered."}</p>
+              <p className="text-sm text-muted-foreground">{language === "ar" ? "لا يمكن مراسلة هذا الرقم حالياً." : "Cannot message this number currently."}</p>
             </div>
           )}
 
@@ -164,11 +168,11 @@ export function AddContactModal() {
             >
               {isChecking ? (
                 <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  جاري التحقق...
+                  <Loader2 className={`${language === "ar" ? "ml-2" : "mr-2"} h-4 w-4 animate-spin`} />
+                  {language === "ar" ? "جاري التحقق..." : "Checking..."}
                 </>
               ) : (
-                "تحقق من الرقم"
+                language === "ar" ? "تحقق من الرقم" : "Verify Number"
               )}
             </Button>
             
@@ -181,11 +185,11 @@ export function AddContactModal() {
               >
                 {isAdding ? (
                   <>
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    جاري الإضافة...
+                    <Loader2 className={`${language === "ar" ? "ml-2" : "mr-2"} h-4 w-4 animate-spin`} />
+                    {language === "ar" ? "جاري الإضافة..." : "Adding..."}
                   </>
                 ) : (
-                  "إضافة جهة اتصال"
+                  t.addContact
                 )}
               </Button>
             )}

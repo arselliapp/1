@@ -134,6 +134,8 @@ export const translations = {
     noChanges: "لا توجد تغييرات لحفظها.",
     phoneRequiredError: "رقم الجوال مطلوب لإكمال تسجيل الدخول.",
     invalidPhone: "الرجاء إدخال رقم جوال صحيح (مثال: 05xxxxxxxx)",
+    phoneNumber: "رقم الجوال",
+    phoneNumberPlaceholder: "مثال: 0555123456",
     imageError: "الرجاء اختيار صورة صحيحة",
     imageSizeError: "حجم الصورة يجب أن يكون أقل من 2 ميجابايت",
     uploadError: "حدث خطأ أثناء رفع الصورة",
