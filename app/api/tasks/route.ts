@@ -23,7 +23,12 @@ function resolveSiteUrl(request: NextRequest) {
     return `${protocol}://${host}`
   }
 
-  return ""
+  // fallback to request origin if available
+  try {
+    return request.nextUrl.origin
+  } catch {
+    return ""
+  }
 }
 
 // أنواع المهام
@@ -373,7 +378,7 @@ export async function POST(request: NextRequest) {
         // إرسال إشعار Push
         try {
           const siteUrl = resolveSiteUrl(request)
-          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : request.nextUrl.origin
 
           await Promise.all(
             targetMembers.map(async (uid: string) => {
