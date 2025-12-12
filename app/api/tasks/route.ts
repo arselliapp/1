@@ -362,56 +362,49 @@ export async function POST(request: NextRequest) {
       }))
 
       if (notifications.length > 0) {
+        // حفظ الإشعارات في قاعدة البيانات أولاً
         await adminClient.from("notifications").insert(notifications)
         console.log("[tasks/route] ✅ Notifications saved to database for", targetMembers.length, "members")
 
-        // إرسال إشعار Push باستخدام URL مطلق (مثل reminders و messages)
-        try {
-          const targetUrl = getNotificationsSendUrl(request)
-          if (!targetUrl) {
-            console.warn("[tasks/route] Cannot resolve site URL, skipping push notifications")
-          } else {
-            console.log("[tasks/route] Sending push notifications to:", targetUrl, "for", targetMembers.length, "members")
-            
-            // إرسال جميع الطلبات بشكل متوازي باستخدام Promise.allSettled (لا يتوقف عند فشل أحدها)
-            const pushPromises = targetMembers.map(async (uid: string) => {
-              try {
-                const resp = await fetch(targetUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    userId: uid,
-                    title: `📋 مهمة جماعية جديدة`,
-                    body: `${creatorName} أضافك لمهمة: ${title}`,
-                    url: `/tasks/${task.id}`,
-                    data: taskNotificationData
-                  })
-                })
-                if (!resp.ok) {
-                  console.error("[tasks/route] Push notification failed for user:", uid, resp.status, resp.statusText)
-                  return { success: false, userId: uid, error: `HTTP ${resp.status}` }
-                } else {
-                  console.log("[tasks/route] ✅ Push notification sent successfully to user:", uid)
-                  return { success: true, userId: uid }
-                }
-              } catch (pushErr) {
-                console.error("[tasks/route] Push notification error for user:", uid, pushErr)
-                return { success: false, userId: uid, error: pushErr }
+        // إرسال إشعار Push فوراً (fire and forget) - لا ننتظر النتيجة
+        const targetUrl = getNotificationsSendUrl(request)
+        if (!targetUrl) {
+          console.warn("[tasks/route] Cannot resolve site URL, skipping push notifications")
+        } else {
+          console.log("[tasks/route] 🚀 Sending push notifications immediately to:", targetUrl, "for", targetMembers.length, "members")
+          
+          // إرسال جميع الطلبات بشكل متوازي بدون انتظار (fire and forget)
+          // هذا يضمن إرسال الإشعارات حتى لو فشل باقي الكود
+          targetMembers.forEach((uid: string) => {
+            fetch(targetUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: uid,
+                title: `📋 مهمة جماعية جديدة`,
+                body: `${creatorName} أضافك لمهمة: ${title}`,
+                url: `/tasks/${task.id}`,
+                data: taskNotificationData
+              })
+            })
+            .then((resp) => {
+              if (!resp.ok) {
+                console.error("[tasks/route] Push notification failed for user:", uid, resp.status, resp.statusText)
+              } else {
+                console.log("[tasks/route] ✅ Push notification sent successfully to user:", uid)
               }
             })
-            
-            // انتظار جميع الطلبات (باستخدام allSettled لا يتوقف عند فشل أحدها)
-            const results = await Promise.allSettled(pushPromises)
-            const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length
-            console.log("[tasks/route] ✅ Push notifications completed:", successCount, "of", targetMembers.length, "sent successfully")
-          }
-        } catch (pushErrOuter) {
-          console.error("[tasks/route] Push notification outer error:", pushErrOuter)
+            .catch((pushErr) => {
+              console.error("[tasks/route] Push notification error for user:", uid, pushErr)
+            })
+          })
+          
+          console.log("[tasks/route] ✅ Push notification requests sent (fire and forget) for", targetMembers.length, "members")
         }
       }
     }
 
-    // إضافة العناصر/الطلبات
+    // إضافة العناصر/الطلبات (يتم بعد إرسال الإشعارات)
     if (items.length > 0) {
       const taskItems = items.map((item: any, index: number) => ({
         task_id: task.id,
