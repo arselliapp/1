@@ -59,12 +59,27 @@ export default function DashboardPage() {
           .from("conversation_participants")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id),
-        // الرسائل غير المقروءة
-        supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .neq("sender_id", user.id)
-          .eq("is_read", false),
+        // الرسائل غير المقروءة - استخدام unread_count من conversation_participants بدلاً من is_read
+        (async () => {
+          try {
+            const result = await supabase
+              .from("conversation_participants")
+              .select("unread_count")
+              .eq("user_id", user.id)
+            
+            if (result.error) {
+              console.warn("[dashboard] Error fetching unread messages:", result.error)
+              return { count: 0, error: result.error }
+            }
+            
+            // حساب مجموع الرسائل غير المقروءة من جميع المحادثات
+            const totalUnread = (result.data || []).reduce((sum: number, p: any) => sum + (p.unread_count || 0), 0)
+            return { count: totalUnread, error: null }
+          } catch (err) {
+            console.warn("[dashboard] Error fetching unread messages:", err)
+            return { count: 0, error: null }
+          }
+        })(),
         // التنبيهات
         supabase
           .from("reminders")
@@ -89,9 +104,15 @@ export default function DashboardPage() {
           .eq("tasks.status", "active")
       ])
 
+      // معالجة نتائج الرسائل غير المقروءة
+      let unreadCount = 0
+      if (unreadResult && !unreadResult.error) {
+        unreadCount = unreadResult.count || 0
+      }
+      
       const newStats = {
         conversations: conversationsResult.count || 0,
-        unreadMessages: unreadResult.count || 0,
+        unreadMessages: unreadCount,
         reminders: remindersResult.count || 0,
         pendingReminders: pendingResult.count || 0,
         tasks: tasksResult.count || 0,
