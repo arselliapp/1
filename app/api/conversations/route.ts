@@ -2,10 +2,17 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Lazily create the client so build doesn't fail when env vars are absent
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !anonKey) {
+    throw new Error("Supabase URL or anon key is not set")
+  }
+
+  return createClient(url, anonKey)
+}
 
 // جلب جميع المحادثات للمستخدم
 export async function GET(request: NextRequest) {
@@ -15,6 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const supabase = getSupabaseClient()
     const token = authHeader.substring(7)
     const { data: userData, error: userError } = await supabase.auth.getUser(token)
     
@@ -121,6 +129,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const supabase = getSupabaseClient()
     const token = authHeader.substring(7)
     const { data: userData, error: userError } = await supabase.auth.getUser(token)
     

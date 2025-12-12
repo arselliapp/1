@@ -76,7 +76,7 @@ self.addEventListener('push', function(event) {
     dir: 'rtl',
     lang: 'ar',
     silent: false, // تأكد من أن الصوت يعمل
-    sound: '/notification.mp3' // إذا كان لديك ملف صوتي
+    sound: '/notification.wav' // ملف صوتي محلي قصير للتنبيه
   });
 
   event.waitUntil(

@@ -66,6 +66,18 @@ export function NotificationWatcher() {
         }
     }
 
+    // محاولة فتح/تفعيل AudioContext بعد أول تفاعل من المستخدم (مطلوب من المتصفح)
+    const primeAudioContext = () => {
+        if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+        }
+        if (audioContextRef.current.state === "suspended") {
+            audioContextRef.current.resume().catch(() => {
+                /* ignore */
+            })
+        }
+    }
+
     // عرض إشعار داخل التطبيق مع رابط التنقل
     const showInAppNotification = (title: string, body: string, type: "message" | "reminder" | "general" = "general", url?: string) => {
         const typeStyles = {
@@ -255,8 +267,17 @@ export function NotificationWatcher() {
         fetchNotifications()
         intervalId = setInterval(fetchNotifications, 10000)
 
+        // تفعيل الصوت بعد أول تفاعل (لمتطلبات أمان المتصفح)
+        const unlock = () => primeAudioContext()
+        document.addEventListener("click", unlock, { once: true })
+        document.addEventListener("touchstart", unlock, { once: true })
+        document.addEventListener("keydown", unlock, { once: true })
+
         return () => {
             document.removeEventListener("visibilitychange", handleVisibility)
+            document.removeEventListener("click", unlock)
+            document.removeEventListener("touchstart", unlock)
+            document.removeEventListener("keydown", unlock)
             if (intervalId) {
                 clearInterval(intervalId)
             }
