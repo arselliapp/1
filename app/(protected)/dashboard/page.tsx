@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/language-context"
 import { useTranslations } from "@/lib/translations"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UsersIcon, SendIcon, MessageSquareIcon, CalendarIcon, ClockIcon, SettingsIcon, ListTodoIcon, PlusIcon } from "@/components/icons"
+import { LanguageToggle } from "@/components/language-toggle"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase/client"
@@ -216,13 +217,16 @@ export default function DashboardPage() {
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title={updatingText} />
             )}
           </div>
-          <Link
-            href="/settings"
-            className="p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
-            title={t.settings}
-          >
-            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <Link
+              href="/settings"
+              className="p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+              title={t.settings}
+            >
+              <SettingsIcon className="w-5 h-5 text-muted-foreground" />
+            </Link>
+          </div>
         </div>
         <p className="text-muted-foreground">{overviewText}</p>
       </div>

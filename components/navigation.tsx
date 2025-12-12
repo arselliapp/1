@@ -92,25 +92,6 @@ export function Navigation() {
             </Link>
           )
         })}
-        
-        {/* Settings and Language Toggle - Mobile */}
-        <div className="md:hidden flex items-center gap-2">
-          <Link
-            href="/settings"
-            className={cn(
-              "flex flex-col items-center gap-1 p-3 rounded-xl transition-colors",
-              pathname === "/settings"
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary",
-            )}
-          >
-            <SettingsIcon className="w-5 h-5" />
-            <span className="text-xs font-medium">{language === "ar" ? "الإعدادات" : "Settings"}</span>
-          </Link>
-          <div className="p-3">
-            <LanguageToggle />
-          </div>
-        </div>
       </div>
 
       {/* User Profile - Desktop */}
@@ -127,16 +108,6 @@ export function Navigation() {
             <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
-          <Link
-            href="/settings"
-            className={cn(
-              "p-2 text-muted-foreground hover:text-foreground transition-colors",
-              pathname === "/settings" && "text-primary"
-            )}
-            title={language === "ar" ? "الإعدادات" : "Settings"}
-          >
-            <SettingsIcon className="w-4 h-4" />
-          </Link>
           <button onClick={signOut} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
             <LogOutIcon className="w-4 h-4" />
           </button>

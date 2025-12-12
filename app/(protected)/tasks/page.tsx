@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface TaskItem {
   id: string
@@ -51,6 +53,8 @@ export default function TasksPage() {
   const defaultTab = searchParams?.get("tab") || "active"
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
 
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,7 +97,7 @@ export default function TasksPage() {
       setDeletingTaskId(taskId)
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        showToast({ title: "تنبيه", message: "الرجاء تسجيل الدخول", type: "info" })
+        showToast({ title: t.warning, message: t.loginRequired, type: "info" })
         return
       }
 
@@ -105,16 +109,16 @@ export default function TasksPage() {
       })
 
       if (response.ok) {
-        showToast({ title: "تم الحذف", message: "تم حذف المهمة", type: "success" })
+        showToast({ title: t.success, message: t.taskDeleted, type: "success" })
         setTasks(prev => prev.filter(t => t.id !== taskId))
       } else {
         const text = await response.text()
         console.error("Failed to delete task:", text)
-        showToast({ title: "خطأ", message: "تعذّر حذف المهمة", type: "error" })
+        showToast({ title: t.error, message: t.deleteTaskError, type: "error" })
       }
     } catch (err) {
       console.error("Error deleting task:", err)
-      showToast({ title: "خطأ", message: "حدث خطأ أثناء الحذف", type: "error" })
+      showToast({ title: t.error, message: t.unexpectedError, type: "error" })
     } finally {
       setDeletingTaskId(null)
     }
@@ -162,22 +166,22 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            📋 المهام
+            📋 {t.tasksTitle}
             {activeTasks.length > 0 && (
-              <Badge variant="secondary">{activeTasks.length} نشطة</Badge>
+              <Badge variant="secondary">{activeTasks.length} {t.active}</Badge>
             )}
           </h1>
-          <p className="text-muted-foreground text-sm">إدارة مهامك اليومية والأسبوعية والشهرية</p>
+          <p className="text-muted-foreground text-sm">{t.taskManagement}</p>
         </div>
         <Link href="/tasks/create">
           <Button>
-            <PlusIcon className="ml-1 h-4 w-4" />
-            مهمة جديدة
+            <PlusIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+            {t.newTaskBtn}
           </Button>
         </Link>
       </div>
@@ -191,7 +195,7 @@ export default function TasksPage() {
           <CardContent className="p-4 text-center">
             <p className="text-3xl">📅</p>
             <p className="text-xl font-bold">{tasks.filter(t => t.task_type === "daily").length}</p>
-            <p className="text-xs text-muted-foreground">يومية</p>
+            <p className="text-xs text-muted-foreground">{t.daily}</p>
           </CardContent>
         </Card>
         <Card 
@@ -201,7 +205,7 @@ export default function TasksPage() {
           <CardContent className="p-4 text-center">
             <p className="text-3xl">📆</p>
             <p className="text-xl font-bold">{tasks.filter(t => t.task_type === "weekly").length}</p>
-            <p className="text-xs text-muted-foreground">أسبوعية</p>
+            <p className="text-xs text-muted-foreground">{t.weekly}</p>
           </CardContent>
         </Card>
         <Card 
@@ -211,7 +215,7 @@ export default function TasksPage() {
           <CardContent className="p-4 text-center">
             <p className="text-3xl">🗓️</p>
             <p className="text-xl font-bold">{tasks.filter(t => t.task_type === "monthly").length}</p>
-            <p className="text-xs text-muted-foreground">شهرية</p>
+            <p className="text-xs text-muted-foreground">{t.monthly}</p>
           </CardContent>
         </Card>
       </div>
@@ -220,16 +224,16 @@ export default function TasksPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-12">
           <TabsTrigger value="active" className="text-sm">
-            🔄 نشطة
+            🔄 {t.active}
             {activeTasks.length > 0 && (
-              <Badge className="mr-1 h-5 min-w-[20px] p-0 justify-center bg-primary">{activeTasks.length}</Badge>
+              <Badge className={`${language === "ar" ? "mr-1" : "ml-1"} h-5 min-w-[20px] p-0 justify-center bg-primary`}>{activeTasks.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="completed" className="text-sm">
-            ✅ مكتملة
+            ✅ {t.completed}
           </TabsTrigger>
           <TabsTrigger value="all" className="text-sm">
-            📋 الكل
+            📋 {t.all}
           </TabsTrigger>
         </TabsList>
 
@@ -239,13 +243,13 @@ export default function TasksPage() {
               <CardContent className="p-12 text-center">
                 <span className="text-6xl block mb-4">📋</span>
                 <p className="text-lg font-medium text-muted-foreground">
-                  {activeTab === "active" ? "لا توجد مهام نشطة" : 
-                   activeTab === "completed" ? "لا توجد مهام مكتملة" : "لا توجد مهام"}
+                  {activeTab === "active" ? t.noActiveTasks : 
+                   activeTab === "completed" ? t.noCompletedTasks : t.noTasks}
                 </p>
                 <Link href="/tasks/create">
                   <Button className="mt-4">
-                    <PlusIcon className="ml-1 h-4 w-4" />
-                    إنشاء مهمة
+                    <PlusIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+                    {t.createTask}
                   </Button>
                 </Link>
               </CardContent>

@@ -12,6 +12,8 @@ import { AddContactModal } from "@/components/add-contact-modal"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface Contact {
   id: string
@@ -27,6 +29,8 @@ export default function ContactsPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
   const [searchQuery, setSearchQuery] = useState("")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,7 +77,7 @@ export default function ContactsPage() {
           return {
             id: contact.id,
             contact_user_id: contact.contact_user_id,
-            name: userData?.full_name || "مستخدم",
+            name: userData?.full_name || (language === "ar" ? "مستخدم" : "User"),
             phone: userData?.phone_number || "",
             avatar: userData?.avatar_url,
             is_online: presence?.is_online || false,
@@ -92,11 +96,11 @@ export default function ContactsPage() {
 
   const handleDeleteContact = async (contactId: string, contactName: string) => {
     showToast({
-      title: "🗑️ حذف جهة الاتصال",
-      message: `هل تريد حذف ${contactName}؟`,
+      title: `🗑️ ${t.deleteContact}`,
+      message: t.deleteContactConfirm.replace("{name}", contactName),
       type: "info",
       action: {
-        label: "حذف",
+        label: t.delete,
         onClick: async () => {
           const { error } = await supabase
             .from("contacts")
@@ -104,7 +108,7 @@ export default function ContactsPage() {
             .eq("id", contactId)
 
           if (!error) {
-            showToast({ title: "✅ تم الحذف", message: "تم حذف جهة الاتصال", type: "success" })
+            showToast({ title: `✅ ${t.success}`, message: t.contactDeleted, type: "success" })
             loadContacts()
           }
         }
@@ -119,7 +123,7 @@ export default function ContactsPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        showToast({ title: "⚠️ خطأ", message: "يجب تسجيل الدخول", type: "error" })
+        showToast({ title: `⚠️ ${t.error}`, message: t.loginRequired, type: "error" })
         return
       }
 
@@ -136,11 +140,11 @@ export default function ContactsPage() {
         const data = await response.json()
         router.push(`/chat/${data.conversation_id}`)
       } else {
-        showToast({ title: "❌ خطأ", message: "فشل بدء المحادثة", type: "error" })
+        showToast({ title: `❌ ${t.error}`, message: language === "ar" ? "فشل بدء المحادثة" : "Failed to start chat", type: "error" })
       }
     } catch (err) {
       console.error("Error starting chat:", err)
-      showToast({ title: "❌ خطأ", message: "حدث خطأ غير متوقع", type: "error" })
+      showToast({ title: `❌ ${t.error}`, message: t.unexpectedError, type: "error" })
     } finally {
       setStartingChat(null)
     }
@@ -171,22 +175,22 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">👥 جهات الاتصال</h1>
-          <p className="text-muted-foreground">{contacts.length} جهة اتصال</p>
+          <h1 className="text-2xl font-bold">👥 {t.contactsTitle}</h1>
+          <p className="text-muted-foreground">{contacts.length} {t.contactsCount}</p>
         </div>
         <AddContactModal />
       </div>
 
       <div className="relative">
-        <SearchIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <SearchIcon className={`absolute ${language === "ar" ? "right-3" : "left-3"} top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground`} />
         <Input
-          placeholder="البحث بالاسم أو الرقم..."
+          placeholder={t.searchContacts}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pr-10"
+          className={language === "ar" ? "pr-10" : "pl-10"}
         />
       </div>
 
@@ -196,7 +200,7 @@ export default function ContactsPage() {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <UserPlusIcon className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground mb-4">
-                {searchQuery ? "لا توجد نتائج" : "لا توجد جهات اتصال بعد"}
+                {searchQuery ? t.noResults : t.noContacts}
               </p>
               {!searchQuery && <AddContactModal />}
             </CardContent>
@@ -222,7 +226,7 @@ export default function ContactsPage() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium truncate">{contact.name}</p>
                         {contact.is_online && (
-                          <Badge className="bg-green-500 text-[10px] px-1.5 py-0">متصل</Badge>
+                          <Badge className="bg-green-500 text-[10px] px-1.5 py-0">{t.online}</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate" dir="ltr">{contact.phone}</p>
@@ -241,8 +245,8 @@ export default function ContactsPage() {
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <>
-                          <MessageSquareIcon className="ml-1 h-4 w-4" />
-                          محادثة
+                          <MessageSquareIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+                          {t.startChat}
                         </>
                       )}
                     </Button>
@@ -251,8 +255,8 @@ export default function ContactsPage() {
                       variant="outline"
                       onClick={() => handleSendReminder(contact.contact_user_id)}
                     >
-                      <CalendarIcon className="ml-1 h-4 w-4" />
-                      تنبيه
+                      <CalendarIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+                      {t.sendReminderBtn}
                     </Button>
                   </div>
                   
@@ -263,8 +267,8 @@ export default function ContactsPage() {
                     className="w-full mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     onClick={() => handleDeleteContact(contact.id, contact.name)}
                   >
-                    <TrashIcon className="ml-1 h-4 w-4" />
-                    حذف
+                    <TrashIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 w-4`} />
+                    {t.delete}
                   </Button>
                 </CardContent>
               </Card>

@@ -17,6 +17,8 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/toast-notification"
+import { useLanguage } from "@/contexts/language-context"
+import { useTranslations } from "@/lib/translations"
 
 interface Reminder {
   id: string
@@ -40,29 +42,31 @@ interface Reminder {
   is_past: boolean
 }
 
-// خيارات التذكير للمواعيد العادية (بالساعات)
-const REMIND_OPTIONS = [
-  { value: 1, label: "قبل ساعة" },
-  { value: 3, label: "قبل 3 ساعات" },
-  { value: 24, label: "قبل يوم" },
-  { value: 168, label: "قبل أسبوع" },
-]
-
-// خيارات التذكير للاتصال (بالدقائق - قيم سالبة للتمييز)
-const CALLBACK_REMIND_OPTIONS = [
-  { value: -5, label: "بعد 5 دقائق", minutes: 5 },
-  { value: -10, label: "بعد 10 دقائق", minutes: 10 },
-  { value: -15, label: "بعد ربع ساعة", minutes: 15 },
-  { value: -30, label: "بعد نصف ساعة", minutes: 30 },
-  { value: -60, label: "بعد ساعة", minutes: 60 },
-]
-
 export default function RemindersPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultTab = searchParams?.get("tab") || "upcoming"
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { language } = useLanguage()
+  const t = useTranslations(language)
+  
+  // خيارات التذكير للمواعيد العادية (بالساعات)
+  const REMIND_OPTIONS = [
+    { value: 1, label: t.remindBefore },
+    { value: 3, label: t.remindBefore3 },
+    { value: 24, label: t.remindBeforeDay },
+    { value: 168, label: t.remindBeforeWeek },
+  ]
+
+  // خيارات التذكير للاتصال (بالدقائق - قيم سالبة للتمييز)
+  const CALLBACK_REMIND_OPTIONS = [
+    { value: -5, label: t.remindAfter5, minutes: 5 },
+    { value: -10, label: t.remindAfter10, minutes: 10 },
+    { value: -15, label: t.remindAfter15, minutes: 15 },
+    { value: -30, label: t.remindAfter30, minutes: 30 },
+    { value: -60, label: t.remindAfter60, minutes: 60 },
+  ]
 
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
@@ -143,10 +147,8 @@ export default function RemindersPage() {
 
       if (response.ok) {
         showToast({
-          title: responseDialog.action === "accept" ? "✅ تم القبول" : "❌ تم الاعتذار",
-          message: responseDialog.action === "accept" 
-            ? "تم قبول الدعوة وسيتم تذكيرك قبل الموعد" 
-            : "تم إرسال اعتذارك",
+          title: responseDialog.action === "accept" ? `✅ ${t.acceptSuccess}` : `❌ ${t.declineSuccess}`,
+          message: responseDialog.action === "accept" ? t.acceptMessage : t.declineMessage,
           type: "success"
         })
         loadReminders()
@@ -154,7 +156,7 @@ export default function RemindersPage() {
       }
     } catch (err) {
       console.error("Error:", err)
-      showToast({ title: "❌ خطأ", message: "حدث خطأ أثناء الإرسال", type: "error" })
+      showToast({ title: `❌ ${t.error}`, message: t.unexpectedError, type: "error" })
     } finally {
       setProcessingId(null)
     }
@@ -162,7 +164,7 @@ export default function RemindersPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString("ar-SA", {
+    return date.toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -171,7 +173,7 @@ export default function RemindersPage() {
   }
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString("ar-SA", {
+    return new Date(dateString).toLocaleTimeString(language === "ar" ? "ar-SA" : "en-US", {
       hour: "2-digit",
       minute: "2-digit"
     })
@@ -179,7 +181,7 @@ export default function RemindersPage() {
 
   const formatDateTime = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleString("ar-SA", {
+      return new Date(dateString).toLocaleString(language === "ar" ? "ar-SA" : "en-US", {
         dateStyle: "short",
         timeStyle: "short",
       })
@@ -193,26 +195,26 @@ export default function RemindersPage() {
     const now = new Date()
     const diff = eventDate.getTime() - now.getTime()
 
-    if (diff < 0) return "انتهى"
+    if (diff < 0) return t.expired
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
 
-    if (days > 0) return `بعد ${days} يوم`
-    if (hours > 0) return `بعد ${hours} ساعة`
-    return "قريباً جداً"
+    if (days > 0) return t.afterDays.replace("{days}", days.toString())
+    if (hours > 0) return t.afterHours.replace("{hours}", hours.toString())
+    return t.soon
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge className="bg-amber-500/20 text-amber-500"><ClockIcon className="ml-1 h-3 w-3" />في الانتظار</Badge>
+        return <Badge className="bg-amber-500/20 text-amber-500"><ClockIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-3 w-3`} />{t.inWaiting}</Badge>
       case "accepted":
-        return <Badge className="bg-green-500"><CheckCircleIcon className="ml-1 h-3 w-3" />مقبول</Badge>
+        return <Badge className="bg-green-500"><CheckCircleIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-3 w-3`} />{t.accepted}</Badge>
       case "declined":
-        return <Badge variant="destructive"><XCircleIcon className="ml-1 h-3 w-3" />معتذر</Badge>
+        return <Badge variant="destructive"><XCircleIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-3 w-3`} />{t.declined}</Badge>
       case "expired":
-        return <Badge variant="secondary">انتهى</Badge>
+        return <Badge variant="secondary">{t.expired}</Badge>
       default:
         return null
     }
@@ -432,7 +434,7 @@ export default function RemindersPage() {
   )
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className={`space-y-6 ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Response Dialog */}
       {responseDialog.show && responseDialog.reminder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -533,17 +535,17 @@ export default function RemindersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            📅 التنبيهات
+            📅 {t.remindersTitle}
             {counts.pending > 0 && (
               <Badge variant="destructive">{counts.pending}</Badge>
             )}
           </h1>
-          <p className="text-muted-foreground text-sm">المواعيد والدعوات</p>
+          <p className="text-muted-foreground text-sm">{language === "ar" ? "المواعيد والدعوات" : "Appointments and invitations"}</p>
         </div>
         <Link href="/send-reminder">
           <Button>
-            <SendIcon className="ml-1 h-4 h-4" />
-            إرسال تنبيه
+            <SendIcon className={`${language === "ar" ? "ml-1" : "mr-1"} h-4 h-4`} />
+            {t.sendReminder}
           </Button>
         </Link>
       </div>
@@ -556,7 +558,7 @@ export default function RemindersPage() {
         >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-amber-500">{counts.pending}</p>
-            <p className="text-xs text-muted-foreground">بانتظار الرد</p>
+            <p className="text-xs text-muted-foreground">{t.pending}</p>
           </CardContent>
         </Card>
         <Card 
@@ -565,7 +567,7 @@ export default function RemindersPage() {
         >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-green-500">{counts.upcoming}</p>
-            <p className="text-xs text-muted-foreground">مواعيد قادمة</p>
+            <p className="text-xs text-muted-foreground">{t.upcoming}</p>
           </CardContent>
         </Card>
         <Card 
@@ -574,7 +576,7 @@ export default function RemindersPage() {
         >
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold text-blue-500">{counts.sent}</p>
-            <p className="text-xs text-muted-foreground">مرسلة</p>
+            <p className="text-xs text-muted-foreground">{t.sent}</p>
           </CardContent>
         </Card>
       </div>
@@ -583,18 +585,18 @@ export default function RemindersPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 h-12">
           <TabsTrigger value="upcoming" className="text-xs sm:text-sm">
-            🗓️ القادمة
-            {upcoming.length > 0 && <Badge className="mr-1 h-5 w-5 p-0 justify-center bg-green-500">{upcoming.length}</Badge>}
+            🗓️ {t.upcoming}
+            {upcoming.length > 0 && <Badge className={`${language === "ar" ? "mr-1" : "ml-1"} h-5 w-5 p-0 justify-center bg-green-500`}>{upcoming.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="pending" className="text-xs sm:text-sm">
-            ⏳ معلقة
-            {pending.length > 0 && <Badge variant="destructive" className="mr-1 h-5 w-5 p-0 justify-center">{pending.length}</Badge>}
+            ⏳ {t.pending}
+            {pending.length > 0 && <Badge variant="destructive" className={`${language === "ar" ? "mr-1" : "ml-1"} h-5 w-5 p-0 justify-center`}>{pending.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="sent" className="text-xs sm:text-sm">
-            📤 مرسلة
+            📤 {t.sent}
           </TabsTrigger>
           <TabsTrigger value="history" className="text-xs sm:text-sm">
-            📋 السجل
+            📋 {t.history}
           </TabsTrigger>
         </TabsList>
 
@@ -603,7 +605,7 @@ export default function RemindersPage() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <CalendarIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-muted-foreground">لا توجد مواعيد قادمة</p>
+                <p className="text-lg font-medium text-muted-foreground">{language === "ar" ? "لا توجد مواعيد قادمة" : "No upcoming appointments"}</p>
               </CardContent>
             </Card>
           ) : (
@@ -616,7 +618,7 @@ export default function RemindersPage() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <InboxIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-muted-foreground">لا توجد دعوات معلقة</p>
+                <p className="text-lg font-medium text-muted-foreground">{language === "ar" ? "لا توجد دعوات معلقة" : "No pending invitations"}</p>
               </CardContent>
             </Card>
           ) : (
@@ -629,7 +631,7 @@ export default function RemindersPage() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <SendIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-muted-foreground">لم ترسل أي تنبيهات</p>
+                <p className="text-lg font-medium text-muted-foreground">{language === "ar" ? "لم ترسل أي تنبيهات" : "No reminders sent"}</p>
               </CardContent>
             </Card>
           ) : (
@@ -642,8 +644,8 @@ export default function RemindersPage() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <ClockIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-muted-foreground">لا يوجد سجل</p>
-                <p className="text-sm text-muted-foreground/70 mt-1">التنبيهات المنتهية أو المرفوضة ستظهر هنا</p>
+                <p className="text-lg font-medium text-muted-foreground">{language === "ar" ? "لا يوجد سجل" : "No history"}</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">{language === "ar" ? "التنبيهات المنتهية أو المرفوضة ستظهر هنا" : "Expired or declined reminders will appear here"}</p>
               </CardContent>
             </Card>
           ) : (
