@@ -27,7 +27,7 @@ export function usePendingRequests(pollInterval = 10000) {
         const { data: { session } } = await supabase.auth.getSession()
         const userId = session?.user?.id
 
-        if (!userId) {
+        if (!userId || !session?.access_token) {
           if (isMountedRef.current) {
             setPendingRequests(0)
             setUnreadMessages(0)
@@ -35,28 +35,64 @@ export function usePendingRequests(pollInterval = 10000) {
           return
         }
 
-        // جلب عدد التنبيهات المعلقة والرسائل غير المقروءة بالتوازي
-        const [remindersResult, messagesResult] = await Promise.all([
+        // جلب عدد التنبيهات المعلقة والرسائل غير المقروءة بالتوازي مع معالجة الأخطاء
+        const [remindersResult, messagesResult] = await Promise.allSettled([
           // تنبيهات معلقة واردة
           supabase
             .from("reminders")
             .select("id", { count: "exact", head: true })
             .eq("recipient_id", userId)
-            .eq("status", "pending"),
-          // رسائل غير مقروءة
-          supabase
-            .from("conversation_participants")
-            .select("unread_count")
-            .eq("user_id", userId)
+            .eq("status", "pending")
+            .catch((err) => {
+              console.warn("[use-pending-requests] Reminders fetch error:", err)
+              return { count: 0, error: null }
+            }),
+          // رسائل غير مقروءة - استخدام API route بدلاً من استعلام مباشر
+          fetch("/api/conversations", {
+            headers: {
+              "Authorization": `Bearer ${session.access_token}`
+            }
+          }).then(res => {
+            if (!res.ok) {
+              console.warn("[use-pending-requests] Conversations API error:", res.status)
+              return { conversations: [] }
+            }
+            return res.json()
+          }).then(data => {
+            // حساب مجموع الرسائل غير المقروءة من جميع المحادثات
+            const unreadCount = (data.conversations || []).reduce((sum: number, conv: any) => {
+              return sum + (conv.unread_count || 0)
+            }, 0)
+            return { unreadCount }
+          }).catch((err) => {
+            console.warn("[use-pending-requests] Conversations fetch error:", err)
+            return { unreadCount: 0 }
+          })
         ])
 
-        const pendingCount = remindersResult.count || 0
-        const unreadCount = messagesResult.data?.reduce((sum, p) => sum + (p.unread_count || 0), 0) || 0
+        // معالجة نتائج reminders
+        let pendingCount = 0
+        if (remindersResult.status === "fulfilled") {
+          const result = remindersResult.value
+          if (!result.error && result.count !== undefined) {
+            pendingCount = result.count || 0
+          }
+        }
+
+        // معالجة نتائج الرسائل
+        let unreadCount = 0
+        if (messagesResult.status === "fulfilled") {
+          const data = messagesResult.value
+          unreadCount = data?.unreadCount || 0
+        }
 
         if (isMountedRef.current) {
           setPendingRequests(pendingCount)
           setUnreadMessages(unreadCount)
         }
+      } catch (err) {
+        console.error("[use-pending-requests] Unexpected error:", err)
+        // في حالة الخطأ، لا نغير القيم الحالية لتجنب flickering
       } finally {
         if (!silent && isMountedRef.current) {
           setLoading(false)
