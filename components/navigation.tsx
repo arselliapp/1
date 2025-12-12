@@ -39,7 +39,12 @@ export function Navigation() {
   ]
 
   return (
-    <nav className="fixed bottom-0 right-0 left-0 md:top-0 md:right-0 md:bottom-0 md:left-auto md:w-64 bg-card border-t md:border-t-0 md:border-l border-border z-50">
+    <nav className={cn(
+      "fixed bottom-0 left-0 right-0 md:top-0 md:bottom-0 md:w-64 bg-card border-t md:border-t-0 border-border z-50",
+      language === "ar" 
+        ? "md:right-0 md:left-auto md:border-l" 
+        : "md:left-0 md:right-auto md:border-r"
+    )}>
       {/* Desktop Header */}
       <div className="hidden md:flex items-center justify-between gap-3 p-6 border-b border-border">
         <div className="flex items-center gap-3">
