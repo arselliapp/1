@@ -378,7 +378,9 @@ export async function POST(request: NextRequest) {
         // إرسال إشعار Push
         try {
           const siteUrl = resolveSiteUrl(request)
-          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : request.nextUrl.origin
+          const targetUrl = siteUrl
+            ? `${siteUrl}/api/notifications/send`
+            : `${request.nextUrl.origin}/api/notifications/send`
 
           await Promise.all(
             targetMembers.map(async (uid: string) => {
