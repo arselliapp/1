@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   CheckCircleIcon, ClockIcon, UsersIcon, CalendarIcon,
-  PlusIcon
+  PlusIcon, TrashIcon
 } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
@@ -27,6 +27,7 @@ interface TaskItem {
 
 interface Task {
   id: string
+  creator_id: string
   title: string
   description?: string
   task_type: "daily" | "weekly" | "monthly"
@@ -55,6 +56,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(defaultTab)
   const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) loadTasks()
@@ -83,6 +85,38 @@ export default function TasksPage() {
       console.error("Error loading tasks:", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      setDeletingTaskId(taskId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        showToast({ title: "تنبيه", message: "الرجاء تسجيل الدخول", type: "info" })
+        return
+      }
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        showToast({ title: "تم الحذف", message: "تم حذف المهمة", type: "success" })
+        setTasks(prev => prev.filter(t => t.id !== taskId))
+      } else {
+        const text = await response.text()
+        console.error("Failed to delete task:", text)
+        showToast({ title: "خطأ", message: "تعذّر حذف المهمة", type: "error" })
+      }
+    } catch (err) {
+      console.error("Error deleting task:", err)
+      showToast({ title: "خطأ", message: "حدث خطأ أثناء الحذف", type: "error" })
+    } finally {
+      setDeletingTaskId(null)
     }
   }
 
@@ -217,81 +251,104 @@ export default function TasksPage() {
               </CardContent>
             </Card>
           ) : (
-            filteredTasks.map(task => (
-              <Link key={task.id} href={`/tasks/${task.id}`}>
-                <Card className={`cursor-pointer hover:shadow-md transition-all text-right ${
-                  task.status === "completed" ? "opacity-70" : ""
-                }`}>
-                  <CardContent className="p-5">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3 flex-row-reverse">
-                      <div className="flex items-center gap-3 flex-row-reverse">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
-                          task.task_type === "daily" ? "bg-blue-500/20" :
-                          task.task_type === "weekly" ? "bg-green-500/20" : "bg-purple-500/20"
-                        }`}>
-                          {task.type_info.emoji}
-                        </div>
-                        <div className="text-right">
-                          <h3 className="font-semibold text-lg">{task.title}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap flex-row-reverse">
-                            <Badge variant="outline" className={`${getTypeColor(task.task_type)} text-white border-0 text-xs`}>
-                              {task.type_info.label}
-                            </Badge>
-                            {task.is_group_task && (
-                              <>
-                                <span className="flex items-center gap-1 flex-row-reverse">
-                                  <UsersIcon className="h-3 w-3" />
-                                  {task.members.length}
-                                </span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {task.completion_type === "any" ? "👤 أي شخص" : "👥 الجميع"}
-                                </Badge>
-                              </>
-                            )}
+            filteredTasks.map(task => {
+              const canDelete = !task.is_group_task || task.role === "creator" || task.creator_id === user?.id
+              return (
+                <Link key={task.id} href={`/tasks/${task.id}`}>
+                  <Card className={`cursor-pointer hover:shadow-md transition-all text-right ${
+                    task.status === "completed" ? "opacity-70" : ""
+                  }`}>
+                    <CardContent className="p-5">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3 flex-row-reverse">
+                        <div className="flex items-center gap-3 flex-row-reverse">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
+                            task.task_type === "daily" ? "bg-blue-500/20" :
+                            task.task_type === "weekly" ? "bg-green-500/20" : "bg-purple-500/20"
+                          }`}>
+                            {task.type_info.emoji}
+                          </div>
+                          <div className="text-right">
+                            <h3 className="font-semibold text-lg">{task.title}</h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap flex-row-reverse">
+                              <Badge variant="outline" className={`${getTypeColor(task.task_type)} text-white border-0 text-xs`}>
+                                {task.type_info.label}
+                              </Badge>
+                              {task.is_group_task && (
+                                <>
+                                  <span className="flex items-center gap-1 flex-row-reverse">
+                                    <UsersIcon className="h-3 w-3" />
+                                    {task.members.length}
+                                  </span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {task.completion_type === "any" ? "👤 أي شخص" : "👥 الجميع"}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <Badge className={task.status === "completed" ? "bg-green-500" : "bg-amber-500"}>
-                        {task.status === "completed" ? "✅ مكتملة" : "🔄 نشطة"}
-                      </Badge>
-                    </div>
-
-                    {/* Progress */}
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-sm mb-1 flex-row-reverse">
-                        <span className="text-muted-foreground">التقدم</span>
-                        <span className="font-medium">{task.progress}%</span>
-                      </div>
-                      <Progress value={task.progress} className="h-2" style={{ direction: "ltr" }} />
-                      <p className="text-xs text-muted-foreground mt-1 text-right">
-                        {task.completed_items} من {task.total_items} مهام
-                      </p>
-                    </div>
-
-                    {/* Members */}
-                    {task.is_group_task && task.members.length > 0 && (
-                      <div className="flex items-center gap-2 flex-row-reverse">
-                        <span className="text-xs text-muted-foreground">المشاركون:</span>
-                        <div className="flex -space-x-2 space-x-reverse">
-                          {task.members.slice(0, 5).map((member, i) => (
-                            <Avatar key={i} className="h-6 w-6 border-2 border-background">
-                              <AvatarImage src={member.avatar} />
-                              <AvatarFallback className="text-xs">{member.name[0]}</AvatarFallback>
-                            </Avatar>
-                          ))}
-                          {task.members.length > 5 && (
-                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs">
-                              +{task.members.length - 5}
-                            </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-row-reverse">
+                          <ClockIcon className="h-4 w-4" />
+                          <span>{new Date(task.created_at).toLocaleDateString("ar-SA")}</span>
+                          {activeTab === "all" && canDelete && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleDeleteTask(task.id)
+                              }}
+                              disabled={deletingTaskId === task.id}
+                            >
+                              {deletingTaskId === task.id ? (
+                                <span className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <TrashIcon className="h-4 w-4" />
+                              )}
+                            </Button>
                           )}
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))
+
+                      {/* Progress */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between text-sm mb-1 flex-row-reverse">
+                          <span className="text-muted-foreground">التقدم</span>
+                          <span className="font-medium">{task.progress}%</span>
+                        </div>
+                        <Progress value={task.progress} className="h-2" style={{ direction: "ltr" }} />
+                        <p className="text-xs text-muted-foreground mt-1 text-right">
+                          {task.completed_items} من {task.total_items} مهام
+                        </p>
+                      </div>
+
+                      {/* Members */}
+                      {task.is_group_task && task.members.length > 0 && (
+                        <div className="flex items-center gap-2 flex-row-reverse">
+                          <span className="text-xs text-muted-foreground">المشاركون:</span>
+                          <div className="flex -space-x-2 space-x-reverse">
+                            {task.members.slice(0, 5).map((member, i) => (
+                              <Avatar key={i} className="h-6 w-6 border-2 border-background">
+                                <AvatarImage src={member.avatar} />
+                                <AvatarFallback className="text-xs">{member.name[0]}</AvatarFallback>
+                              </Avatar>
+                            ))}
+                            {task.members.length > 5 && (
+                              <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs">
+                                +{task.members.length - 5}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })
           )}
         </TabsContent>
       </Tabs>

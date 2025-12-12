@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { 
   ClockIcon, CheckCircleIcon, XCircleIcon, BellIcon, 
-  CalendarIcon, SendIcon, InboxIcon, MessageSquareIcon 
+  CalendarIcon, SendIcon, InboxIcon, MessageSquareIcon
 } from "@/components/icons"
 import { supabase } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
@@ -77,6 +77,7 @@ export default function RemindersPage() {
   }>({ show: false, reminder: null, action: "accept", selectedHours: [], message: "" })
 
   const [counts, setCounts] = useState({ upcoming: 0, pending: 0, sent: 0 })
+  const [deletingReminderId, setDeletingReminderId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) loadReminders()
@@ -176,6 +177,17 @@ export default function RemindersPage() {
     })
   }
 
+  const formatDateTime = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleString("ar-SA", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    } catch {
+      return dateString
+    }
+  }
+
   const getTimeRemaining = (dateString: string) => {
     const eventDate = new Date(dateString)
     const now = new Date()
@@ -232,21 +244,47 @@ export default function RemindersPage() {
     .filter(r => r.is_sent)
     .sort(sortByCreatedDesc)
   
-  // السجل: التنبيهات الواردة المنتهية أو المرفوضة (بدون المرسلة) - مرتبة بالأحدث أولاً
+  // السجل: جميع التنبيهات مرتبة بالأحدث
   const history = reminders
-    .filter(r => 
-      !r.is_sent && (
-        r.is_past ||
-        r.status === "declined" ||
-        r.status === "expired"
-      )
-    )
-    .sort(sortByRespondedDesc)
+    .slice()
+    .sort(sortByCreatedDesc)
 
   // تغيير التبويب
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     router.push(`/reminders?tab=${tab}`, { scroll: false })
+  }
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    try {
+      setDeletingReminderId(reminderId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        showToast({ title: "تنبيه", message: "الرجاء تسجيل الدخول", type: "warning" })
+        return
+      }
+
+      const response = await fetch(`/api/reminders/${reminderId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        showToast({ title: "تم الحذف", message: "تم حذف التنبيه للجميع", type: "success" })
+        await loadReminders()
+      } else {
+        const text = await response.text()
+        console.error("Failed to delete reminder:", text)
+        showToast({ title: "خطأ", message: "تعذّر حذف التنبيه", type: "error" })
+      }
+    } catch (err) {
+      console.error("Error deleting reminder:", err)
+      showToast({ title: "خطأ", message: "حدث خطأ أثناء الحذف", type: "error" })
+    } finally {
+      setDeletingReminderId(null)
+    }
   }
 
   if (loading) {
@@ -257,7 +295,7 @@ export default function RemindersPage() {
     )
   }
 
-  const ReminderCard = ({ reminder, showActions = false }: { reminder: Reminder; showActions?: boolean }) => (
+  const ReminderCard = ({ reminder, showActions = false, showDelete = false }: { reminder: Reminder; showActions?: boolean; showDelete?: boolean }) => (
     <Card className={`text-right ${reminder.is_past ? "opacity-60" : ""} ${reminder.status === "pending" && !reminder.is_sent ? "border-amber-500/50 bg-amber-500/5" : ""}`}>
       <CardContent className="p-5">
         {/* Header */}
@@ -271,7 +309,24 @@ export default function RemindersPage() {
               </p>
             </div>
           </div>
-          {getStatusBadge(reminder.status)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(reminder.status)}
+            {showDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleDeleteReminder(reminder.id)}
+                disabled={deletingReminderId === reminder.id}
+              >
+                {deletingReminderId === reminder.id ? (
+                  <span className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="text-lg">✕</span>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Description - يظهر كـ "الغرض منه" للاجتماعات */}
@@ -319,6 +374,14 @@ export default function RemindersPage() {
             <p className="text-sm">{reminder.response_message}</p>
           </div>
         )}
+
+        {/* Timestamps */}
+        <div className="mt-3 text-xs text-muted-foreground space-y-1 text-right">
+          <div>📤 أُرسِل: {formatDateTime(reminder.created_at)}</div>
+          {reminder.responded_at && (
+            <div>💬 رُدّ عليه: {formatDateTime(reminder.responded_at)}</div>
+          )}
+        </div>
 
         {/* Actions */}
         {showActions && reminder.status === "pending" && !reminder.is_sent && (
@@ -479,7 +542,7 @@ export default function RemindersPage() {
         </div>
         <Link href="/send-reminder">
           <Button>
-            <SendIcon className="ml-1 h-4 w-4" />
+            <SendIcon className="ml-1 h-4 h-4" />
             إرسال تنبيه
           </Button>
         </Link>
@@ -584,7 +647,9 @@ export default function RemindersPage() {
               </CardContent>
             </Card>
           ) : (
-            history.map(r => <ReminderCard key={r.id} reminder={r} />)
+            history.map(r => (
+              <ReminderCard key={r.id} reminder={r} showDelete />
+            ))
           )}
         </TabsContent>
       </Tabs>
