@@ -213,7 +213,6 @@ export async function POST(request: NextRequest) {
       description, 
       task_type, 
       is_group_task,
-      completion_type = "all", // "all" = الجميع، "any" = أي شخص
       member_ids = [],
       items = [],
       due_date
@@ -229,7 +228,7 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient()
 
-    // إنشاء المهمة
+    // إنشاء المهمة (بدون completion_type لأنه غير موجود في قاعدة البيانات)
     const taskData: any = {
       creator_id: userData.user.id,
       title,
@@ -240,11 +239,6 @@ export async function POST(request: NextRequest) {
       status: "active"
     }
     
-    // إضافة completion_type فقط إذا كانت مهمة جماعية
-    if (is_group_task && member_ids.length > 0) {
-      taskData.completion_type = completion_type
-    }
-    
     const { data: task, error } = await adminClient
       .from("tasks")
       .insert(taskData)
@@ -252,66 +246,13 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error creating task:", error)
+      console.error("[tasks/route] Error creating task:", error)
       // التحقق من أن الجدول موجود
       if (error.code === "42P01" || error.message.includes("does not exist")) {
         return NextResponse.json({ 
           error: "جداول المهام غير موجودة. يرجى تشغيل SQL في Supabase أولاً",
           details: "Run database/tasks_schema.sql in Supabase SQL Editor"
         }, { status: 500 })
-      }
-      // إذا كان الخطأ بسبب عمود غير موجود، نحاول بدونه
-      if (error.message.includes("completion_type") || error.code === "42703") {
-        const { data: taskRetry, error: retryError } = await adminClient
-          .from("tasks")
-          .insert({
-            creator_id: userData.user.id,
-            title,
-            description,
-            task_type,
-            is_group_task: is_group_task && member_ids.length > 0,
-            due_date,
-            status: "active"
-          })
-          .select()
-          .single()
-        
-        if (!retryError && taskRetry) {
-          // إكمال باقي العملية مع المهمة الجديدة
-          await adminClient.from("task_assignments").insert({
-            task_id: taskRetry.id,
-            user_id: userData.user.id,
-            role: "owner"
-          })
-
-          if (is_group_task && member_ids.length > 0) {
-            const memberAssignments = member_ids
-              .filter((id: string) => id !== userData.user.id)
-              .map((user_id: string) => ({
-                task_id: taskRetry.id,
-                user_id,
-                role: "member"
-              }))
-
-            if (memberAssignments.length > 0) {
-              await adminClient.from("task_assignments").insert(memberAssignments)
-            }
-          }
-
-          if (items.length > 0) {
-            const taskItems = items.map((item: any, index: number) => ({
-              task_id: taskRetry.id,
-              title: item.title,
-              description: item.description,
-              assigned_to: item.assigned_to,
-              order_index: index
-            }))
-
-            await adminClient.from("task_items").insert(taskItems)
-          }
-
-          return NextResponse.json({ task: taskRetry })
-        }
       }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
