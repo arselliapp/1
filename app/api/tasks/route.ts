@@ -239,7 +239,11 @@ export async function POST(request: NextRequest) {
       status: "active"
     }
     
-    const { data: task, error } = await adminClient
+    let task
+    let taskError = null
+    
+    // محاولة إنشاء المهمة
+    const { data: taskResult, error } = await adminClient
       .from("tasks")
       .insert(taskData)
       .select()
@@ -247,6 +251,9 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("[tasks/route] Error creating task:", error)
+      console.error("[tasks/route] Error code:", error.code)
+      console.error("[tasks/route] Error message:", error.message)
+      
       // التحقق من أن الجدول موجود
       if (error.code === "42P01" || error.message.includes("does not exist")) {
         return NextResponse.json({ 
@@ -254,7 +261,38 @@ export async function POST(request: NextRequest) {
           details: "Run database/tasks_schema.sql in Supabase SQL Editor"
         }, { status: 500 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      
+      // إذا كان الخطأ بسبب عمود غير موجود (مثل completion_type)، نحاول بدون إضافة حقول اختيارية
+      if (error.code === "PGRST204" || error.message.includes("column") || error.message.includes("schema cache")) {
+        console.warn("[tasks/route] Column not found error, retrying without optional fields")
+        // إعادة المحاولة بدون أي حقول اختيارية
+        const retryTaskData = {
+          creator_id: userData.user.id,
+          title,
+          description,
+          task_type,
+          is_group_task: is_group_task && member_ids.length > 0,
+          due_date,
+          status: "active"
+        }
+        
+        const { data: retryTask, error: retryError } = await adminClient
+          .from("tasks")
+          .insert(retryTaskData)
+          .select()
+          .single()
+        
+        if (retryError) {
+          console.error("[tasks/route] Retry also failed:", retryError)
+          return NextResponse.json({ error: retryError.message }, { status: 500 })
+        }
+        
+        task = retryTask
+      } else {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    } else {
+      task = taskResult
     }
 
     // إضافة المنشئ كمالك
