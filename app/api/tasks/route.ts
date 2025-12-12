@@ -324,10 +324,15 @@ export async function POST(request: NextRequest) {
     })
 
     // إضافة المشاركين الآخرين
-    console.log("[tasks/route] Task creation - is_group_task:", is_group_task, "member_ids.length:", member_ids.length)
+    console.log("[tasks/route] ===== TASK CREATION DEBUG =====")
+    console.log("[tasks/route] is_group_task:", is_group_task)
+    console.log("[tasks/route] member_ids:", member_ids)
+    console.log("[tasks/route] member_ids.length:", member_ids?.length || 0)
+    console.log("[tasks/route] task.id:", task.id)
+    console.log("[tasks/route] creator_id:", userData.user.id)
     
-    if (is_group_task && member_ids.length > 0) {
-      console.log("[tasks/route] Processing group task with", member_ids.length, "members")
+    if (is_group_task && member_ids && member_ids.length > 0) {
+      console.log("[tasks/route] ✅ Processing group task with", member_ids.length, "members")
       
       const memberAssignments = member_ids
         .filter((id: string) => id !== userData.user.id)
@@ -366,40 +371,37 @@ export async function POST(request: NextRequest) {
         await adminClient.from("notifications").insert(notifications)
         console.log("[tasks/route] ✅ Notifications saved to database for", targetMembers.length, "members")
 
-        // إرسال إشعار Push فوراً (fire and forget) - لا ننتظر النتيجة
+        // إرسال إشعار Push - نفس الطريقة المستخدمة في حذف المهمة
         const targetUrl = getNotificationsSendUrl(request)
         if (!targetUrl) {
           console.warn("[tasks/route] Cannot resolve site URL, skipping push notifications")
         } else {
-          console.log("[tasks/route] 🚀 Sending push notifications immediately to:", targetUrl, "for", targetMembers.length, "members")
+          console.log("[tasks/route] 🚀 Sending push notifications to:", targetUrl, "for", targetMembers.length, "members")
           
-          // إرسال جميع الطلبات بشكل متوازي بدون انتظار (fire and forget)
-          // هذا يضمن إرسال الإشعارات حتى لو فشل باقي الكود
-          targetMembers.forEach((uid: string) => {
-            fetch(targetUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: uid,
-                title: `📋 مهمة جماعية جديدة`,
-                body: `${creatorName} أضافك لمهمة: ${title}`,
-                url: `/tasks/${task.id}`,
-                data: taskNotificationData
-              })
-            })
-            .then((resp) => {
-              if (!resp.ok) {
-                console.error("[tasks/route] Push notification failed for user:", uid, resp.status, resp.statusText)
-              } else {
-                console.log("[tasks/route] ✅ Push notification sent successfully to user:", uid)
+          const payload = {
+            title: `📋 مهمة جماعية جديدة`,
+            body: `${creatorName} أضافك لمهمة: ${title}`,
+            url: `/tasks/${task.id}`,
+            data: taskNotificationData
+          }
+
+          // استدعاء مسار الإشعارات لإرسال Push باستخدام URL مطلق - مثل كود الحذف تماماً
+          await Promise.all(
+            targetMembers.map(async (uid: string) => {
+              try {
+                await fetch(targetUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId: uid, ...payload })
+                })
+                console.log("[tasks/route] ✅ Push notification sent to user:", uid)
+              } catch (e) {
+                console.error("[tasks/route] Failed to send push notification for user:", uid, e)
               }
             })
-            .catch((pushErr) => {
-              console.error("[tasks/route] Push notification error for user:", uid, pushErr)
-            })
-          })
+          )
           
-          console.log("[tasks/route] ✅ Push notification requests sent (fire and forget) for", targetMembers.length, "members")
+          console.log("[tasks/route] ✅ Push notifications completed for", targetMembers.length, "members")
         }
       }
     }
