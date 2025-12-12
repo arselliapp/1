@@ -3,6 +3,24 @@ import type { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase-server"
 
+function resolveSiteUrl(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  const host = request.headers.get("host")
+  if (host) {
+    const protocol = host.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  }
+
+  return ""
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -78,6 +96,26 @@ export async function DELETE(
       .filter(uid => uid && uid !== userData.user.id)
 
     if (otherMembers.length > 0) {
+      const siteUrl = resolveSiteUrl(request)
+
+      // حفظ إشعار في قاعدة البيانات
+      const notifications = otherMembers.map(uid => ({
+        user_id: uid,
+        title: "🗑️ تم حذف مهمة",
+        body: `قام المنشئ بحذف المهمة: ${task.title}`,
+        type: "task_deleted",
+        url: "/tasks",
+        data: { taskId: params.id }
+      }))
+
+      try {
+        await admin
+          .from("notifications")
+          .insert(notifications)
+      } catch (e) {
+        console.error("Failed to insert delete notifications:", e)
+      }
+
       const payload = {
         title: "🗑️ تم حذف مهمة",
         body: `قام المنشئ بحذف المهمة: ${task.title}`,
@@ -89,7 +127,8 @@ export async function DELETE(
       await Promise.all(
         otherMembers.map(async (uid) => {
           try {
-            await fetch(`${request.nextUrl.origin}/api/notifications/send`, {
+            const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+            await fetch(targetUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ userId: uid, ...payload })
