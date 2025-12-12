@@ -23,7 +23,6 @@ function resolveSiteUrl(request: NextRequest) {
     return `${protocol}://${host}`
   }
 
-  // fallback to request origin if available
   try {
     return request.nextUrl.origin
   } catch {
@@ -373,37 +372,53 @@ export async function POST(request: NextRequest) {
       }))
 
       if (notifications.length > 0) {
-        await adminClient.from("notifications").insert(notifications)
+        const { error: notifInsertError } = await adminClient.from("notifications").insert(notifications)
+        if (notifInsertError) {
+          console.error("Task create: failed to insert notifications", notifInsertError)
+        }
 
         // إرسال إشعار Push
         try {
           const siteUrl = resolveSiteUrl(request)
-          const targetUrl = siteUrl
-            ? `${siteUrl}/api/notifications/send`
-            : `${request.nextUrl.origin}/api/notifications/send`
+          const originFallback =
+            siteUrl ||
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+            request.headers.get("origin") ||
+            request.nextUrl.origin ||
+            ""
 
-          await Promise.all(
-            targetMembers.map(async (uid: string) => {
-              try {
-                const resp = await fetch(targetUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    userId: uid,
-                    title: `📋 مهمة جماعية جديدة`,
-                    body: `${creatorName} أضافك لمهمة: ${title}`,
-                    url: `/tasks/${task.id}`,
-                    data: { taskId: task.id, type: "task" }
+          if (!originFallback) {
+            console.error("Task create: no origin available for push send")
+          }
+
+          const targetUrl = originFallback
+            ? `${originFallback.replace(/\/$/, "")}/api/notifications/send`
+            : ""
+
+          if (targetUrl) {
+            await Promise.all(
+              targetMembers.map(async (uid: string) => {
+                try {
+                  const resp = await fetch(targetUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      userId: uid,
+                      title: `📋 مهمة جماعية جديدة`,
+                      body: `${creatorName} أضافك لمهمة: ${title}`,
+                      url: `/tasks/${task.id}`,
+                      data: { taskId: task.id, type: "task" }
+                    })
                   })
-                })
-                if (!resp.ok) {
-                  console.error("Push task notify failed for user:", uid)
+                  if (!resp.ok) {
+                    console.error("Push task notify failed for user:", uid, "status:", resp.status)
+                  }
+                } catch (pushErr) {
+                  console.error("Push task notify error for user:", uid, pushErr)
                 }
-              } catch (pushErr) {
-                console.error("Push task notify error:", pushErr)
-              }
-            })
-          )
+              })
+            )
+          }
         } catch (pushErrOuter) {
           console.error("Push task notify outer error:", pushErrOuter)
         }
