@@ -23,6 +23,7 @@ function resolveSiteUrl(request: NextRequest) {
     return `${protocol}://${host}`
   }
 
+  // fallback to request origin if available
   try {
     return request.nextUrl.origin
   } catch {
@@ -372,55 +373,34 @@ export async function POST(request: NextRequest) {
       }))
 
       if (notifications.length > 0) {
-        const { error: notifInsertError } = await adminClient.from("notifications").insert(notifications)
-        if (notifInsertError) {
-          console.error("Task create: failed to insert notifications", notifInsertError)
-        }
+        await adminClient.from("notifications").insert(notifications)
 
-        // إرسال إشعار Push
+        // إرسال Push Notification فوري - نفس طريقة التنبيهات
         try {
           const siteUrl = resolveSiteUrl(request)
-          const originFallback =
-            siteUrl ||
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-            request.headers.get("origin") ||
-            request.nextUrl.origin ||
-            ""
-
-          if (!originFallback) {
-            console.error("Task create: no origin available for push send")
-          }
-
-          const targetUrl = originFallback
-            ? `${originFallback.replace(/\/$/, "")}/api/notifications/send`
-            : ""
-
-          if (targetUrl) {
-            await Promise.all(
-              targetMembers.map(async (uid: string) => {
-                try {
-                  const resp = await fetch(targetUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      userId: uid,
-                      title: `📋 مهمة جماعية جديدة`,
-                      body: `${creatorName} أضافك لمهمة: ${title}`,
-                      url: `/tasks/${task.id}`,
-                      data: { taskId: task.id, type: "task" }
-                    })
+          const targetUrl = siteUrl ? `${siteUrl}/api/notifications/send` : "/api/notifications/send"
+          
+          await Promise.all(
+            targetMembers.map(async (uid: string) => {
+              try {
+                await fetch(targetUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    userId: uid,
+                    title: `📋 مهمة جماعية جديدة`,
+                    body: `${creatorName} أضافك لمهمة: ${title}`,
+                    url: `/tasks/${task.id}`,
+                    data: { taskId: task.id, type: "task" }
                   })
-                  if (!resp.ok) {
-                    console.error("Push task notify failed for user:", uid, "status:", resp.status)
-                  }
-                } catch (pushErr) {
-                  console.error("Push task notify error for user:", uid, pushErr)
-                }
-              })
-            )
-          }
+                })
+              } catch (pushErr) {
+                console.error("Failed to send push notification for new task:", pushErr)
+              }
+            })
+          )
         } catch (pushErrOuter) {
-          console.error("Push task notify outer error:", pushErrOuter)
+          console.error("Failed to send push notifications for new task:", pushErrOuter)
         }
       }
     }
