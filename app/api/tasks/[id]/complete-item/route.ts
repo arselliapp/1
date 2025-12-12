@@ -147,6 +147,8 @@ export async function POST(
       const siteUrl = resolveSiteUrl(request)
       
       if (completed && otherMembers.length > 0) {
+        const notifData = { taskId, itemId: item_id, type: "task_update", realtime: true }
+
         // حفظ الإشعارات في قاعدة البيانات
         const notifications = otherMembers.map(m => ({
           user_id: m.user_id,
@@ -154,7 +156,7 @@ export async function POST(
           body: `${completerName} أنجز: ${item.title}`,
           type: "task_update",
           url: `/tasks/${taskId}`,
-          data: JSON.stringify({ taskId, itemId: item_id, realtime: true }),
+          data: notifData,
           is_read: false
         }))
 
@@ -176,7 +178,7 @@ export async function POST(
                 title: `✅ تم إنجاز مهمة`,
                 body: `${completerName} أنجز: ${item.title}`,
                 url: `/tasks/${taskId}`,
-                data: { taskId, itemId: item_id }
+                data: notifData
               })
             })
             if (!response.ok) {
